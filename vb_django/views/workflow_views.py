@@ -197,9 +197,11 @@ class WorkflowView(viewsets.ViewSet):
                 amodel = None
             if workflow is None or amodel is None:
                 message = []
-                message = message if workflow else message.append("No workflow found for id: {}".format(inputs["workflow_id"]))
-                message = message if amodel else message.append("No analytical model found for id: {}".format(inputs["amodel_id"]))
-                return Response(",".join(message), status=status.HTTP_400_BAD_REQUEST)
+                if workflow is None:
+                    message.append("No workflow found for id: {}".format(inputs["workflow_id"]))
+                if amodel is None:
+                    message.append("No analytical model found for id: {}".format(inputs["model_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
             elif IsOwnerOfLocationChild().has_object_permission(request, self, workflow):
                 response = {}
                 meta = Metadata(parent=amodel)
