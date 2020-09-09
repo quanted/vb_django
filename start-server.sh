@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ ! -d "/opt/app/vb_django/static" ]
+if [ ! -d "/opt/app/vb_django/vb_django/static" ]
 then
   mkdir /opt/app/vb_django/static
 fi
