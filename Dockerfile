@@ -16,7 +16,7 @@ RUN pip install uwsgi==2.0.19.1
 COPY vb_django/uwsgi.ini /etc/uwsgi/
 COPY start-server.sh /opt/app/start-django-server.sh
 RUN chown -R www-data:www-data /opt/app
-RUN chmod 755 /opt/app/start-django-server.sh
+RUN chmod 775 /opt/app/start-django-server.sh
 
 WORKDIR /opt/app
 ENV PYTHONPATH="/opt/app:/opt/app/vb_django:${PYTHONPATH}"
