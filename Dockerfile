@@ -22,4 +22,4 @@ RUN chmod 755 /tmp/start-django-server.sh && \
 WORKDIR /opt/app
 ENV PYTHONPATH="/opt/app:/opt/app/vb_django:${PYTHONPATH}"
 USER ${APP_USER}:${APP_USER}
-CMD ["sh", "/tmp/start-django-server.sh"]
+#CMD ["sh", "/tmp/start-django-server.sh"]
