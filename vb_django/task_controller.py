@@ -5,6 +5,7 @@ from io import StringIO
 from vb_django.app.linear_regression import LinearRegressionAutomatedVB
 from vb_django.app.metadata import Metadata
 from dask import delayed
+from dask_kubernetes import KubeCluster
 import pickle
 import pandas as pd
 import os
@@ -12,6 +13,7 @@ import json
 import socket
 import logging
 import time
+
 
 logger = logging.getLogger("vb_dask")
 logger.setLevel(logging.INFO)
@@ -32,7 +34,13 @@ class DaskTasks:
         amodel.dataset = dataset.id
         amodel.save()
 
-        client = Client(dask_scheduler)
+        in_kube = bool(int(os.getenv("IN_KUBE", 0)))
+        if in_kube:
+            cluster = KubeCluster.from_yaml(os.path.join("vb_django", "static", "dask-worker-kube.yml"))
+            cluster.adapt(minimum=int(os.getenv("IN_KUBE_N_MIN", 1)), maximum=int(os.getenv("IN_KUBE_N_MAX", 10)))
+            client = Client(cluster)
+        else:
+            client = Client(dask_scheduler)
         df = pd.read_csv(StringIO(bytes(dataset.data).decode())).drop("ID", axis=1)
         # add preprocessing to task
         fire_and_forget(client.submit(DaskTasks.execute_task, df, int(amodel.id), str(amodel.name), int(dataset_id)))
