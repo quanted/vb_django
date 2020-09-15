@@ -3,7 +3,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import make_pipeline
 from sklearn.impute import SimpleImputer, KNNImputer
-from vb_django.vb_django.app.vb_helper import None_T
+from vb_django.app.vb_helper import None_T
 import pandas as pd
 import numpy as np
 import logging

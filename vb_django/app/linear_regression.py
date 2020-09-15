@@ -3,8 +3,8 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.linear_model import LinearRegression, ElasticNet
 from sklearn.compose import TransformedTargetRegressor
-from vb_django.vb_django.app.vb_helper import ShrinkBigKTransformer, Logminus_T, Exp_T, Logminplus1_T, None_T, Logp1_T, DropConst
-from vb_django.vb_django.app.missing_val_transformer import MissingValHandler
+from vb_django.app.vb_helper import ShrinkBigKTransformer, Logminus_T, Exp_T, Logminplus1_T, None_T, Logp1_T, DropConst
+from vb_django.app.missing_val_transformer import MissingValHandler
 import pandas as pd
 import numpy as np
 import warnings
