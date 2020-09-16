@@ -36,8 +36,13 @@ class DaskTasks:
 
         in_kube = bool(int(os.getenv("IN_KUBE", 0)))
         if in_kube:
-            cluster = KubeCluster.from_yaml(os.path.join("vb_django", "static", "dask-worker-kube.yml"))
+            logger.info("CWD: {}".format(os.getcwd()))
+            cluster = KubeCluster.from_yaml(os.path.join("vb_django", "vb_django", "static", "dask-worker-kube.yml"))
             cluster.adapt(minimum=int(os.getenv("IN_KUBE_N_MIN", 1)), maximum=int(os.getenv("IN_KUBE_N_MAX", 10)))
+            # dask_host = dask_scheduler.split(":")
+            # cluster._deploy_mode = "remote"
+            # cluster.host = dask_host[0]
+            # cluster.port = int(dask_host[1])
             client = Client(cluster)
         else:
             client = Client(dask_scheduler)
@@ -67,6 +72,7 @@ class DaskTasks:
 
         if model_name == "lra":
             DaskTasks.execute_lra(model_id, parameters, x, y, step_count[model_name])
+
 
     @staticmethod
     def update_status(_id, status, stage, message=None, retry=5):

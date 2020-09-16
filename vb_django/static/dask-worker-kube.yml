@@ -1,7 +1,7 @@
 kind: Pod
 metadata:
   labels:
-    foo: dask-worker-spawn
+    app: dask-worker-spawn
 spec:
   restartPolicy: Never
   containers:
@@ -21,10 +21,10 @@ spec:
         name: vb-dask-volume
     resources:
       limits:
-        cpu: "2"
+        cpu: "1"
         memory: 2G
       requests:
-        cpu: "2"
+        cpu: "1"
         memory: 2G
   volumes:
     - name: vb-dask-volume
