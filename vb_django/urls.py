@@ -21,7 +21,7 @@ from rest_framework import permissions, routers
 from drf_yasg.views import get_schema_view
 # from rest_framework.schemas import get_schema_view
 from drf_yasg import openapi
-from .landing import landing
+from .landing import landing, asset_redirect
 from vb_django.views.user_views import UserView, UserLoginView
 from vb_django.views.locations_views import LocationView
 from vb_django.views.workflow_views import WorkflowView
@@ -58,8 +58,8 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('', landing),
+    re_path(r'^assets/*', asset_redirect),      # additional statics files
     path('admin/', admin.site.urls),
-    path('app/*', serve),
 
     # ----------- Swagger Docs/UI ------------- #
     # path('swagger/', TemplateView.as_view(
