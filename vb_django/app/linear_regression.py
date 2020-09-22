@@ -3,8 +3,10 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.linear_model import LinearRegression, ElasticNet
 from sklearn.compose import TransformedTargetRegressor
-from vb_django.app.vb_helper import ShrinkBigKTransformer, Logminus_T, Exp_T, Logminplus1_T, None_T, Logp1_T, DropConst
+from vb_django.app.vb_transformers import ShrinkBigKTransformer, LogMinus_T, Exp_T, LogMinPlus1_T, None_T, LogP1_T, DropConst
 from vb_django.app.missing_val_transformer import MissingValHandler
+from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
+
 import pandas as pd
 import numpy as np
 import warnings
@@ -31,13 +33,15 @@ class LinearRegressionAutomatedVB:
     id = "lra"
     description = "Automated pipeline with feature evaluation and selection for a linear regression estimator."
 
-    def __init__(self, test_split=0.2, cv_folds=10, cv_reps=10, seed=42, one_out=False, missing_strategy='impute_middle'):
+    def __init__(self, test_split=0.2, cv_folds=10, cv_reps=10, seed=42, one_out=False, cv_strategy='q-balanced', group_count=5):
         self.hyperparameters = {
             'test_split': 0.2,
             'cv_folds': 10,
             'cv_reps': 10,
             'random_seed': 42,
-            'one_out': False
+            'one_out': False,
+            'cv_strategy': 'q-balanced',
+            'group_count': 5
         }
         self.start_time = time.time()
         self.test_split = test_split
@@ -46,7 +50,8 @@ class LinearRegressionAutomatedVB:
         self.gridpoints = 3
         self.seed = seed
         self.one_out = one_out
-        self.missing_strategy = missing_strategy
+        self.cv_strategy = cv_strategy
+        self.group_count = group_count
 
         self.k = None
         self.n = None
@@ -72,6 +77,8 @@ class LinearRegressionAutomatedVB:
         self.cv_reps = int(self.hyperparameters['cv_reps'])
         self.seed = int(self.hyperparameters['random_seed'])
         self.one_out = bool(self.hyperparameters['one_out'])
+        self.cv_strategy = str(self.hyperparameters['cv_strategy'])
+        self.group_count = int(self.hyperparameters['group_count'])
 
     def set_data(self, x, y):
         if self.one_out:
@@ -88,30 +95,34 @@ class LinearRegressionAutomatedVB:
     @ignore_warnings(category=ConvergenceWarning)
     def set_pipeline(self):
         warnings.filterwarnings('ignore')
-
-        transformer_list = [None_T(), Logp1_T()]
+        gridpoints = self.gridpoints
+        transformer_list = [None_T(), LogP1_T()]
         steps = [
             ('prep', MissingValHandler()),
             ('scaler', StandardScaler()),
-            ('shrink_k1', ShrinkBigKTransformer()),      # retain a subset of the best original variables
-            ('polyfeat', PolynomialFeatures(interaction_only=0)),        # create interactions among them
-
+            ('shrink_k1', ShrinkBigKTransformer()),  # retain a subset of the best original variables
+            ('polyfeat', PolynomialFeatures(interaction_only=0)),  # create interactions among them
             ('drop_constant', DropConst()),
-            ('shrink_k2', ShrinkBigKTransformer(selector=ElasticNet())),     # pick from all of those options
-            ('reg', LinearRegression(fit_intercept=1))
-        ]
+            ('shrink_k2', ShrinkBigKTransformer(selector=ElasticNet())),  # pick from all of those options
+            ('reg', LinearRegression(fit_intercept=1))]
+
         X_T_pipe = Pipeline(steps=steps)
-        inner_cv = RepeatedKFold(n_splits=5, n_repeats=2, random_state=0)
+        if self.cv_strategy == 'q-balanced':
+            inner_cv = RegressorQStratifiedCV(n_splits=10, n_repeats=2, random_state=0, group_count=self.group_count)
+
+        else:
+            inner_cv = RepeatedKFold(n_splits=10, n_repeats=1, random_state=0)
+
         Y_T_X_T_pipe = Pipeline(steps=[('ttr', TransformedTargetRegressor(regressor=X_T_pipe))])
         Y_T__param_grid = {
             'ttr__transformer': transformer_list,
             'ttr__regressor__polyfeat__degree': [2],
-            'ttr__regressor__shrink_k2__selector__alpha': np.logspace(-2, 2, self.gridpoints),
-            'ttr__regressor__shrink_k2__selector__l1_ratio': np.linspace(0, 1, self.gridpoints),
-            'ttr__regressor__shrink_k1__max_k': [self.k//gp for gp in range(1, self.gridpoints+1)],
+            'ttr__regressor__shrink_k2__selector__alpha': np.logspace(-2, 2, gridpoints),
+            'ttr__regressor__shrink_k2__selector__l1_ratio': np.linspace(0, 1, gridpoints),
+            'ttr__regressor__shrink_k1__max_k': [self.k // gp for gp in range(1, gridpoints + 1, 2)],
             'ttr__regressor__prep__strategy': ['impute_middle', 'impute_knn_10']
         }
-        lin_reg_Xy_transform = GridSearchCV(Y_T_X_T_pipe, param_grid=Y_T__param_grid, cv=inner_cv, n_jobs=-1)
+        lin_reg_Xy_transform = GridSearchCV(Y_T_X_T_pipe, param_grid=Y_T__param_grid, cv=inner_cv, n_jobs=11)
 
         self.lr_estimator = lin_reg_Xy_transform
         self.lr_estimator.fit(self.x_train, self.y_train)
