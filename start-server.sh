@@ -4,7 +4,7 @@
 #then
 #  mkdir /opt/app/vb_django/vb_django/static
 #fi
-python /opt/app/vb_django/manage.py collectstatic --noinput
+#python /opt/app/vb_django/manage.py collectstatic --noinput
 python /opt/app/vb_django/manage.py migrate --noinput
 python /opt/app/vb_django/manage.py migrate auth --noinput
 python /opt/app/vb_django/manage.py migrate sessions --noinput
