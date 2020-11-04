@@ -2,90 +2,77 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-class Location(models.Model):
+class Project(models.Model):
     owner_id = models.ForeignKey(User, on_delete=models.CASCADE)
-    name = models.CharField(max_length=64)
-    description = models.CharField(max_length=128)
-    start_latitude = models.FloatField(max_length=12)
-    start_longitude = models.FloatField(max_length=12)
-    end_latitude = models.FloatField(max_length=12)
-    end_longitude = models.FloatField(max_length=12)
-    o_latitude = models.FloatField(max_length=12)
-    o_longitude = models.FloatField(max_length=12)
+    name = models.CharField(max_length=128)
+    description = models.CharField(max_length=512)
 
 
-class LocationMetadata(models.Model):
-    base_id = models.ForeignKey(Location, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    value = models.CharField(max_length=128)
-
-
-class Workflow(models.Model):
-    location_id = models.ForeignKey(Location, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    description = models.CharField(max_length=128)
-
-
-class WorkflowResults(models.Model):
-    workflow_id = models.ForeignKey(Workflow, on_delete=models.CASCADE)
-    dataset_id = models.CharField(max_length=32)           # ModelData ID
-    timestamp = models.DateTimeField()
-    comments = models.CharField(max_length=256)
-
-
-class PreProcessingConfig(models.Model):
-    workflow_id = models.ForeignKey(Workflow, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    config = models.CharField(max_length=512)
-
-
-class AnalyticalModel(models.Model):
-    workflow_id = models.ForeignKey(Workflow, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    description = models.CharField(max_length=128)
-    variables = models.CharField(max_length=256, null=True, blank=True)        # serializable JSON
-    model = models.BinaryField(null=True, blank=True)
-    dataset = models.CharField(max_length=16, null=True, blank=True)
-
-
-class ModelMetadata(models.Model):
-    base_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    value = models.CharField(max_length=128)
-
-
-class ModelData(models.Model):
-    model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
-    dataset = models.CharField(max_length=32)           # dataset ID
-    name = models.CharField(max_length=32)
-    data = models.BinaryField()
-    comments = models.CharField(max_length=256)
-
-
-class ModelResults(models.Model):
-    model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
-    dataset = models.CharField(max_length=32)   # dataset ID
-    timestamp = models.DateTimeField()
-    result = models.FloatField()
+class ProjectMetadata(models.Model):
+    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    value = models.CharField(max_length=512)
 
 
 class Dataset(models.Model):
-    workflow_id = models.ForeignKey(Workflow, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    description = models.CharField(max_length=128)
+    owner_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    location_id = models.CharField(max_length=64)
+    name = models.CharField(max_length=128)
+    description = models.CharField(max_length=512)
     data = models.BinaryField()
 
 
 class DatasetMetadata(models.Model):
-    base_id = models.ForeignKey(Dataset, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
-    value = models.CharField(max_length=128)
+    dataset_id = models.ForeignKey(Dataset, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    value = models.CharField(max_length=512)
+
+
+class Location(models.Model):
+    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    description = models.CharField(max_length=512)
+    type = models.CharField(max_length=64)
+
+
+class LocationMetadata(models.Model):
+    base_id = models.ForeignKey(Location, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    value = models.CharField(max_length=512)
+
+
+class AnalyticalModel(models.Model):
+    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    description = models.CharField(max_length=512)
+    variables = models.CharField(max_length=512, null=True, blank=True)        # serializable JSON
+    model = models.BinaryField(null=True, blank=True)
+    dataset_id = models.CharField(max_length=64, null=True, blank=True)
+
+
+class PreProcessingConfig(models.Model):
+    analytical_model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    config = models.CharField(max_length=512)
+
+
+class ModelMetadata(models.Model):
+    analytical_model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+    value = models.CharField(max_length=512)
+
+
+class ModelResults(models.Model):
+    model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
+    dataset_id = models.CharField(max_length=64)
+    timestamp = models.DateTimeField()
+    result = models.FloatField()
 
 
 class AccessControlList(models.Model):
     types = (
+        ('Project', 'Project'),
         ('Location', 'Location'),
-        ('Workflow', 'Workflow'),
         ('AnalyticalModel', 'AnalyticalModel'),
         ('Dataset', 'Dataset')
     )
@@ -96,6 +83,6 @@ class AccessControlList(models.Model):
     owner_id = models.ForeignKey(User, on_delete=models.CASCADE)
     target_user_id = models.CharField(max_length=32)
     object_id = models.CharField(max_length=32)
-    object_type = models.CharField(max_length=15, choices=types)
+    object_type = models.CharField(max_length=16, choices=types)
     expiration = models.DateTimeField()
-    access_type = models.CharField(max_length=5, choices=a_types)
+    access_type = models.CharField(max_length=8, choices=a_types)

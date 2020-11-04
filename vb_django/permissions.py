@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from vb_django.models import AnalyticalModel, Workflow, Location
+from vb_django.models import AnalyticalModel, Location
 
 
 class IsOwner(permissions.BasePermission):
