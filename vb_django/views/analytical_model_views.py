@@ -6,7 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from vb_django.models import AnalyticalModel
 from vb_django.app.metadata import Metadata
 from vb_django.serializers import AnalyticalModelSerializer
-from vb_django.permissions import IsOwnerOfWorkflowChild
+from vb_django.permissions import IsOwnerOfProjectChild
 
 
 class AnalyticalModelView(viewsets.ViewSet):
@@ -15,20 +15,20 @@ class AnalyticalModelView(viewsets.ViewSet):
     """
     serializer_class = AnalyticalModelSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOfWorkflowChild]
+    permission_classes = [IsAuthenticated, IsOwnerOfProjectChild]
 
     def list(self, request):
         """
-        GET request that lists all the analytical models for a specific workflow id
-        :param request: GET request, containing the workflow id as 'workflow'
+        GET request that lists all the analytical models for a specific project id
+        :param request: GET request, containing the project id as 'project'
         :return: List of analytical models
         """
-        if 'workflow_id' in self.request.query_params.keys():
-            a_models = AnalyticalModel.objects.filter(workflow_id=int(self.request.query_params.get('workflow_id')))
+        if 'project_id' in self.request.query_params.keys():
+            a_models = AnalyticalModel.objects.filter(project_id=int(self.request.query_params.get('project_id')))
             serializer = self.serializer_class(a_models, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(
-            "Required 'workflow' parameter for the workflow id was not found.",
+            "Required 'project_id' parameter for the project id was not found.",
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -63,7 +63,7 @@ class AnalyticalModelView(viewsets.ViewSet):
                     "No analytical model found for id: {}".format(pk),
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, original_amodel):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, original_amodel):
                 amodel = serializer.update(original_amodel, serializer.validated_data)
                 if amodel:
                     response_status = status.HTTP_201_CREATED
@@ -87,7 +87,7 @@ class AnalyticalModelView(viewsets.ViewSet):
                 amodel = AnalyticalModel.objects.get(id=int(pk))
             except AnalyticalModel.DoesNotExist:
                 return Response("No analytical model found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, amodel):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, amodel):
                 amodel.delete()
                 return Response(status=status.HTTP_200_OK)
             else:

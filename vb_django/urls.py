@@ -24,7 +24,7 @@ from drf_yasg import openapi
 from .landing import landing, asset_redirect
 from vb_django.views.user_views import UserView, UserLoginView
 from vb_django.views.locations_views import LocationView
-# from vb_django.views.workflow_views import WorkflowView
+from vb_django.views.project_views import ProjectView
 from vb_django.views.analytical_model_views import AnalyticalModelView
 from vb_django.views.dataset_views import DatasetView
 from vb_django.views.preprocessing_views import PreProcessingConfigView
@@ -34,8 +34,8 @@ from vb_django.views.utilities_views import analytical_model_details
 router = routers.SimpleRouter()
 # ---------- Location API endpoints ---------- #
 router.register('location', LocationView, basename='location')
-# --------- Workflows API endpoints ---------- #
-# router.register('workflow', WorkflowView, basename='workflow')
+# --------- Project API endpoints ---------- #
+router.register('project', ProjectView, basename='project')
 # ------ Analytical Model API endpoints ------ #
 router.register('analyticalmodel', AnalyticalModelView, basename='analyticalmodel')
 # --------- Dataset API endpoints ---------- #

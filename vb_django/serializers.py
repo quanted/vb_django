@@ -108,10 +108,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         return can_update
 
     def update(self, instance, validated_data):
-        can_update = self.check_integrity(instance)
         project = Project(**validated_data)
-        if can_update:
-            project.id = instance.id
+        project.id = instance.id
         project.save()
         return project
 
@@ -194,7 +192,7 @@ class AnalyticalModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalyticalModel
         fields = [
-            "id", "project_id", "name", "description", "variables", "dataset_id"
+            "id", "project_id", "name", "type", "description", "variables", "dataset_id"
         ]
 
 

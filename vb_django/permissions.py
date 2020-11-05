@@ -10,20 +10,20 @@ class IsOwner(permissions.BasePermission):
         return obj.owner_id == request.user
 
 
-class IsOwnerOfLocationChild(permissions.BasePermission):
+class IsOwnerOfProjectChild(permissions.BasePermission):
     """
-    Checks if the user ia the owner of the workflow's corresponding location.
-    """
-    def has_object_permission(self, request, view, obj):
-        return obj.location_id.owner_id == request.user
-
-
-class IsOwnerOfWorkflowChild(permissions.BasePermission):
-    """
-    Checks if the user ia the owner of the analytical model's corresponding location.
+    Checks if the user is the owner of the parent project
     """
     def has_object_permission(self, request, view, obj):
-        return obj.workflow_id.location_id.owner_id == request.user
+        return obj.project_id.owner_id == request.user
+
+
+class IsOwnerOfAnalyticalModelChild(permissions.BasePermission):
+    """
+    Checks if the user is the owner of the analytical model's parent project.
+    """
+    def has_object_permission(self, request, view, obj):
+        return obj.analyticalmodel_id.project_id.owner_id == request.user
 
 
 class HasModelIntegrity(permissions.BasePermission):

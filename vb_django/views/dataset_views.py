@@ -1,10 +1,10 @@
-from rest_framework import viewsets, status, views
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from vb_django.models import Dataset
 from vb_django.serializers import DatasetSerializer
-from vb_django.permissions import IsOwnerOfWorkflowChild
+from vb_django.permissions import IsOwner
 from vb_django.app.metadata import Metadata
 from vb_django.app.statistics import DatasetStatistics
 from io import StringIO
@@ -17,24 +17,20 @@ class DatasetView(viewsets.ViewSet):
     """
     serializer_class = DatasetSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOfWorkflowChild]
+    permission_classes = [IsAuthenticated, IsOwner]
 
     def list(self, request, pk=None):
         """
-        GET request that lists all the Datasets for a specific workflow id
-        :param request: GET request, containing the workflow id as 'workflow'
+        GET request that lists all the Datasets for the user, not containing the data.
+        :param request: GET request
         :return: List of datasets
         """
-        if 'workflow_id' in self.request.query_params.keys():
-            a_models = Dataset.objects.filter(workflow_id=int(self.request.query_params.get('workflow_id')))
-            serializer = self.serializer_class(a_models, many=True)
-            for d in serializer.data:
-                del d["data"]
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(
-            "Required 'workflow_id' parameter for the workflow id was not found.",
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        datasets = Dataset.objects.filter(owner_id=request.user)
+        # TODO: Add ACL access objects
+        serializer = self.serializer_class(datasets, many=True)
+        for d in serializer.data:
+            del d["data"]
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None):
         """
@@ -44,7 +40,12 @@ class DatasetView(viewsets.ViewSet):
         :return: Dataset data and relevant statistics
         """
         if pk:
-            dataset = Dataset.objects.get(pk=pk)
+            try:
+                dataset = Dataset.objects.get(pk=pk)
+            except Dataset.DoesNotExist:
+                return Response("No dataset found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
+            if not IsOwner().has_object_permission(request, self, dataset):
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
             serializer = self.serializer_class(dataset, many=False)
             response_data = serializer.data
             m = Metadata(dataset)
@@ -60,14 +61,14 @@ class DatasetView(viewsets.ViewSet):
             return Response(response_data, status=status.HTTP_200_OK)
         else:
             return Response(
-                "Required id for the dataset id was not found.",
+                "Required id for the dataset was not found.",
                 status=status.HTTP_400_BAD_REQUEST
             )
 
     def create(self, request):
         """
         POST request that creates a new Dataset.
-        :param request: POST request
+        :param request: POST request.
         :return: New dataset
         """
         dataset_inputs = request.data.dict()
@@ -94,6 +95,12 @@ class DatasetView(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
+        """
+        PUT request to update a dataset
+        :param request: PUT request
+        :param pk: dataset ID to be updated
+        :return: 200/details of updated dataset, 400/bad request, or 401/unauthorized
+        """
         dataset_inputs = request.data.dict()
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid() and pk is not None:
@@ -104,7 +111,7 @@ class DatasetView(viewsets.ViewSet):
                     "No dataset model found for id: {}".format(pk),
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, original_dataset):
+            if IsOwner().has_object_permission(request, self, original_dataset):
                 amodel = serializer.update(original_dataset, serializer.validated_data)
                 m = Metadata(amodel, dataset_inputs["metadata"])
                 meta = m.set_metadata("DatasetMetadata")
@@ -123,12 +130,18 @@ class DatasetView(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
+        """
+        DEL to delete an existing dataset specified by dataset ID
+        :param request: DEL request
+        :param pk: dataset ID to be deleted
+        :return: 200/success, 400/bad request, or 401/unauthorized
+        """
         if pk is not None:
             try:
                 dataset = Dataset.objects.get(id=int(pk))
             except Dataset.DoesNotExist:
                 return Response("No dataset found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, dataset):
+            if IsOwner().has_object_permission(request, self, dataset):
                 m = Metadata(dataset)
                 m.delete_metadata("DatasetMetadata")
                 dataset.delete()

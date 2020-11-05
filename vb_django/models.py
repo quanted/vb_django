@@ -36,7 +36,7 @@ class Location(models.Model):
 
 
 class LocationMetadata(models.Model):
-    base_id = models.ForeignKey(Location, on_delete=models.CASCADE)
+    location_id = models.ForeignKey(Location, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
@@ -44,10 +44,10 @@ class LocationMetadata(models.Model):
 class AnalyticalModel(models.Model):
     project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
+    type = models.CharField(max_length=16)
     description = models.CharField(max_length=512)
     variables = models.CharField(max_length=512, null=True, blank=True)        # serializable JSON
     model = models.BinaryField(null=True, blank=True)
-    dataset_id = models.CharField(max_length=64, null=True, blank=True)
 
 
 class PreProcessingConfig(models.Model):

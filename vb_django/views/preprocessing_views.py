@@ -5,7 +5,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from vb_django.models import PreProcessingConfig
 from vb_django.serializers import PreProcessingConfigSerializer
-from vb_django.permissions import IsOwnerOfWorkflowChild
+from vb_django.permissions import IsOwnerOfAnalyticalModelChild
 from vb_django.app.preprocessing import DAGFunctions
 import json
 
@@ -16,20 +16,20 @@ class PreProcessingConfigView(viewsets.ViewSet):
     """
     serializer_class = PreProcessingConfigSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOfWorkflowChild]
+    permission_classes = [IsAuthenticated, IsOwnerOfAnalyticalModelChild]
 
     def list(self, request, pk=None):
         """
-        GET request that lists all the Pre-Processing Config for a specific workflow id
-        :param request: GET request, containing the workflow id as 'workflow'
+        GET request that lists all the Pre-Processing Config for a specific analytical model id
+        :param request: GET request, containing the analytical model id as 'workflow'
         :return: List of pre-processing configurations
         """
         if 'workflow_id' in self.request.query_params.keys():
-            pp_configs = PreProcessingConfig.objects.filter(workflow_id=int(self.request.query_params.get('workflow_id')))
+            pp_configs = PreProcessingConfig.objects.filter(analytical_model_id=int(self.request.query_params.get('analytical_model_id')))
             serializer = self.serializer_class(pp_configs, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(
-            "Required 'workflow_id' parameter for the workflow id was not found.",
+            "Required 'analytical_model_id' parameter for the analytical model  was not found.",
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -58,13 +58,13 @@ class PreProcessingConfigView(viewsets.ViewSet):
                     "No pre-processing config found for id: {}".format(pk),
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, original_pp_config):
-                amodel = serializer.update(original_pp_config, serializer.validated_data)
-                if amodel:
+            if IsOwnerOfAnalyticalModelChild().has_object_permission(request, self, original_pp_config):
+                pp = serializer.update(original_pp_config, serializer.validated_data)
+                if pp:
                     response_status = status.HTTP_201_CREATED
                     response_data = serializer.data
-                    response_data["id"] = amodel.id
-                    if int(pk) == amodel.id:
+                    response_data["id"] = pp.id
+                    if int(pk) == pp.id:
                         response_status = status.HTTP_200_OK
                     return Response(response_data, status=response_status)
             else:
@@ -77,7 +77,7 @@ class PreProcessingConfigView(viewsets.ViewSet):
                 pp_config = PreProcessingConfig.objects.get(id=int(pk))
             except PreProcessingConfig.DoesNotExist:
                 return Response("No pre-processing config found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, pp_config):
+            if IsOwnerOfAnalyticalModelChild().has_object_permission(request, self, pp_config):
                 pp_config.delete()
                 return Response(status=status.HTTP_200_OK)
             else:
