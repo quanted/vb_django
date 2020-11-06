@@ -26,7 +26,12 @@ class AnalyticalModelView(viewsets.ViewSet):
         if 'project_id' in self.request.query_params.keys():
             a_models = AnalyticalModel.objects.filter(project_id=int(self.request.query_params.get('project_id')))
             serializer = self.serializer_class(a_models, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            response_data = serializer.data
+            for l in response_data:
+                a = AnalyticalModel.objects.get(pk=int(l["id"]))
+                m = Metadata(a, None)
+                l["metadata"] = m.get_metadata("ModelMetadata")
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response(
             "Required 'project_id' parameter for the project id was not found.",
             status=status.HTTP_400_BAD_REQUEST
@@ -42,14 +47,15 @@ class AnalyticalModelView(viewsets.ViewSet):
         serializer = self.serializer_class(data=amodel_inputs, context={'request': request})
         if serializer.is_valid():
             serializer.save()
-            amodel_inputs = serializer.data
-            if "metadata" in amodel_inputs.keys():
+            amodel = serializer.data
+            if "metadata" not in amodel_inputs.keys():
                 amodel_inputs["metadata"] = None
-                m = Metadata(amodel_inputs, amodel_inputs["metadata"])
-                meta = m.set_metadata("ModelMetadata")
-                amodel_inputs["metadata"] = m.get_metadata("ModelMetadata")
-            if amodel_inputs:
-                return Response(amodel_inputs, status=status.HTTP_201_CREATED)
+            a = AnalyticalModel.objects.get(pk=int(amodel["id"]))
+            m = Metadata(a, amodel_inputs["metadata"])
+            meta = m.set_metadata("ModelMetadata")
+            amodel["metadata"] = meta
+            if amodel:
+                return Response(amodel, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
@@ -71,11 +77,11 @@ class AnalyticalModelView(viewsets.ViewSet):
                     response_data["id"] = amodel.id
                     if int(pk) == amodel.id:
                         response_status = status.HTTP_200_OK
-                    if "metadata" in amodel_inputs.keys():
+                    if "metadata" not in amodel_inputs.keys():
                         amodel_inputs["metadata"] = None
-                        m = Metadata(amodel_inputs, amodel_inputs["metadata"])
-                        meta = m.set_metadata("ModelMetadata")
-                        response_data["metadata"] = m.get_metadata("ModelMetadata")
+                    a = AnalyticalModel.objects.get(pk=amodel.id)
+                    m = Metadata(a, amodel_inputs["metadata"])
+                    response_data["metadata"] = m.set_metadata("ModelMetadata")
                     return Response(response_data, status=response_status)
             else:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)

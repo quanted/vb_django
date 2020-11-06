@@ -57,6 +57,7 @@ class LocationSerializer(serializers.ModelSerializer):
         validated = True
         if validated:
             location = Location(**validated_data)
+            location.project = Project.objects.filter(id=int(self.context["request"].data["project_id"]))[0]
             location.save()
         return location
 
@@ -68,6 +69,7 @@ class LocationSerializer(serializers.ModelSerializer):
             can_update = self.check_integrity(instance)
             if can_update:
                 location = Location(**validated_data)
+                location.project = instance.project
                 location.id = instance.id
                 location.save()
             else:
@@ -86,7 +88,7 @@ class LocationMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocationMetadata
         fields = [
-            "id", "location_id", "name", "value"
+            "id", "parent_id", "name", "value"
         ]
 
 
@@ -95,6 +97,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         project = Project(**validated_data)
+        project.owner_id = self.context["request"].user
         project.save()
         return project
 
@@ -110,6 +113,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         project = Project(**validated_data)
         project.id = instance.id
+        project.owner_id = instance.owner_id
         project.save()
         return project
 
@@ -124,7 +128,7 @@ class ProjectMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectMetadata
         fields = [
-            "id", "project_id", "name", "value"
+            "id", "parent_id", "name", "value"
         ]
 
 
@@ -145,6 +149,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         if "data" in validated_data.keys():
             validated_data["data"] = str(validated_data["data"]).encode()
         dataset = Dataset(**validated_data)
+        dataset.owner_id = self.context["request"].user
         dataset.save()
         return dataset
 
@@ -152,8 +157,8 @@ class DatasetSerializer(serializers.ModelSerializer):
         if "data" in validated_data.keys():
             validated_data["data"] = str(validated_data["data"]).encode()
         dataset = Dataset(**validated_data)
-        if self.check_integrity(dataset.owner_id):
-            dataset.id = instance.id
+        # if self.check_integrity(dataset.owner_id):
+        dataset.id = instance.id
         dataset.owner_id = instance.owner_id
         dataset.save()
         return dataset
@@ -169,7 +174,7 @@ class DatasetMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = DatasetMetadata
         fields = [
-            "id", "dataset_id", "name", "value"
+            "id", "parent_id", "name", "value"
         ]
 
 
@@ -178,6 +183,7 @@ class AnalyticalModelSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         amodel = AnalyticalModel(**validated_data)
+        amodel.project_id = amodel.project_id.id
         amodel.save()
         return amodel
 
@@ -192,7 +198,7 @@ class AnalyticalModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalyticalModel
         fields = [
-            "id", "project_id", "name", "type", "description", "variables", "dataset_id"
+            "id", "project_id", "name", "type", "description", "variables"
         ]
 
 
@@ -200,14 +206,14 @@ class PreProcessingConfigSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PreProcessingConfig
-        fields = ["analytical_model_id", "id", "name", "config"]
+        fields = ["analytical_model", "id", "name", "config"]
 
 
 class ModelMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelMetadata
         fields = [
-            "id", "analytical_model_id", "name", "value"
+            "id", "parent_id", "name", "value"
         ]
 
 

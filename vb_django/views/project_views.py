@@ -34,6 +34,12 @@ class ProjectView(viewsets.ViewSet):
         projects = Project.objects.filter(owner_id=request.user)
         # TODO: Add ACL access objects
         serializer = self.serializer_class(projects, many=True)
+        response_data = serializer.data
+        for d in response_data:
+            p = Project.objects.get(id=d["id"])
+            m = Metadata(p, None)
+            meta = m.get_metadata("ProjectMetadata")
+            d["metadata"] = meta
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request):
@@ -52,9 +58,8 @@ class ProjectView(viewsets.ViewSet):
                 dataset_inputs["metadata"] = None
             m = Metadata(p, dataset_inputs["metadata"])
             meta = m.set_metadata("ProjectMetadata")
-            p["metadata"] = meta
-            if project:
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            project["metadata"] = meta
+            return Response(project, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
@@ -80,7 +85,7 @@ class ProjectView(viewsets.ViewSet):
                 if meta:
                     response_data["metadata"] = meta
                 request_status = status.HTTP_200_OK
-                return Response(serializer.data, status=request_status)
+                return Response(response_data, status=request_status)
             else:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

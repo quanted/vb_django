@@ -15,7 +15,7 @@ class IsOwnerOfProjectChild(permissions.BasePermission):
     Checks if the user is the owner of the parent project
     """
     def has_object_permission(self, request, view, obj):
-        return obj.project_id.owner_id == request.user
+        return obj.project.owner_id == request.user
 
 
 class IsOwnerOfAnalyticalModelChild(permissions.BasePermission):
@@ -23,7 +23,7 @@ class IsOwnerOfAnalyticalModelChild(permissions.BasePermission):
     Checks if the user is the owner of the analytical model's parent project.
     """
     def has_object_permission(self, request, view, obj):
-        return obj.analyticalmodel_id.project_id.owner_id == request.user
+        return obj.analyticalmodel.project.owner_id == request.user
 
 
 class HasModelIntegrity(permissions.BasePermission):

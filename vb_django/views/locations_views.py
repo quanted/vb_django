@@ -22,10 +22,19 @@ class LocationView(viewsets.ViewSet):
         :param request: GET request
         :return: List of locations
         """
-        locations = Location.objects.filter(project__owner_id=request.user)
+        projects = Project.objects.filter(owner_id=request.user)
+        p_ids = []
+        for p in projects:
+            p_ids.append(p.id)
+        locations = Location.objects.filter(project_id__in=p_ids)
         # TODO: Add ACL access objects
         serializer = self.serializer_class(locations, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = serializer.data
+        for l in response_data:
+            loc = Location.objects.get(pk=int(l["id"]))
+            m = Metadata(loc, None)
+            l["metadata"] = m.get_metadata("LocationMetadata")
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def create(self, request):
         """
@@ -33,14 +42,15 @@ class LocationView(viewsets.ViewSet):
         :param request: POST request
         :return: New location object
         """
-        dataset_inputs = request.data
+        dataset_inputs = request.data.dict()
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
+        # TODO: Add project existence and ownership check
         if serializer.is_valid():
             location = serializer.save()
             location_data = serializer.data
             if "metadata" not in dataset_inputs.keys():
                 dataset_inputs["metadata"] = None
-            m = Metadata(location_data, dataset_inputs["metadata"])
+            m = Metadata(location, dataset_inputs["metadata"])
             meta = m.set_metadata("LocationMetadata")
             if meta:
                 location_data["metadata"] = meta

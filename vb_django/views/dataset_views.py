@@ -108,7 +108,7 @@ class DatasetView(viewsets.ViewSet):
                 original_dataset = Dataset.objects.get(id=int(pk))
             except Dataset.DoesNotExist:
                 return Response(
-                    "No dataset model found for id: {}".format(pk),
+                    "No dataset found for id: {}".format(pk),
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if IsOwner().has_object_permission(request, self, original_dataset):

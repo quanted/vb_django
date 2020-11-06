@@ -9,40 +9,40 @@ class Project(models.Model):
 
 
 class ProjectMetadata(models.Model):
-    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    parent_id = models.ForeignKey(Project, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
 
 class Dataset(models.Model):
     owner_id = models.ForeignKey(User, on_delete=models.CASCADE)
-    location_id = models.CharField(max_length=64)
+    location_id = models.CharField(max_length=64, null=True)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
     data = models.BinaryField()
 
 
 class DatasetMetadata(models.Model):
-    dataset_id = models.ForeignKey(Dataset, on_delete=models.CASCADE)
+    parent_id = models.ForeignKey(Dataset, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
 
 class Location(models.Model):
-    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
     type = models.CharField(max_length=64)
 
 
 class LocationMetadata(models.Model):
-    location_id = models.ForeignKey(Location, on_delete=models.CASCADE)
+    parent_id = models.ForeignKey(Location, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
 
 class AnalyticalModel(models.Model):
-    project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     type = models.CharField(max_length=16)
     description = models.CharField(max_length=512)
@@ -51,13 +51,13 @@ class AnalyticalModel(models.Model):
 
 
 class PreProcessingConfig(models.Model):
-    analytical_model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
+    analytical_model = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     config = models.CharField(max_length=512)
 
 
 class ModelMetadata(models.Model):
-    analytical_model_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
+    parent_id = models.ForeignKey(AnalyticalModel, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 

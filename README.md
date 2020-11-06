@@ -85,7 +85,7 @@ AnalyticalModel:
 		description: return list of all analytical models for the specified project ID
 	
 	'analyticalmodel/' POST
-		args: project_id(id)*, dataset_id(id), type(string)*, description(string), name(string)*, variables(serialized json string)*, metadata(serialized json string)*
+		args: project_id(id)*, dataset_id(id), type(string)*, description(string), name(string)*, variables(json object), metadata(json object)
 		description: creates a new analytical model object.
 	
 	'analyticalmodel/ID/' PUT
