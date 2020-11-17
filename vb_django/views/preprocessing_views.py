@@ -21,10 +21,10 @@ class PreProcessingConfigView(viewsets.ViewSet):
     def list(self, request, pk=None):
         """
         GET request that lists all the Pre-Processing Config for a specific analytical model id
-        :param request: GET request, containing the analytical model id as 'workflow'
+        :param request: GET request, containing the analytical model id as 'analytical_model_id'
         :return: List of pre-processing configurations
         """
-        if 'workflow_id' in self.request.query_params.keys():
+        if 'analytical_model_id' in self.request.query_params.keys():
             pp_configs = PreProcessingConfig.objects.filter(analytical_model_id=int(self.request.query_params.get('analytical_model_id')))
             serializer = self.serializer_class(pp_configs, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)

@@ -6,12 +6,15 @@ from sklearn.compose import TransformedTargetRegressor
 from vb_django.app.vb_transformers import ShrinkBigKTransformer, LogMinus_T, Exp_T, LogMinPlus1_T, None_T, LogP1_T, DropConst
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
+from vb_django.utilities import update_status
+from vb_django.models import Dataset, AnalyticalModel
 
 import pandas as pd
 import numpy as np
 import warnings
 import time
 import logging
+import pickle
 
 from sklearn.utils.testing import ignore_warnings
 from sklearn.exceptions import ConvergenceWarning
@@ -20,6 +23,62 @@ logger = logging.getLogger("vb_dask")
 logger.setLevel(logging.INFO)
 
 warnings.simplefilter('ignore')
+
+
+def execute_lra(model_id, parameters, x, y, step_count):
+    update_status(model_id, "Initializing automated linear regressor", "3/{}".format(step_count))
+    logger.info("Model ID: {}, Initializing automated linear regressor. step 3/{}".format(model_id, step_count))
+    t = LinearRegressionAutomatedVB()
+    t.validate_h_params(parameters)
+    try:
+        t.set_data(x, y)
+    except Exception as ex:
+        logger.warning("Model ID: {}, Error setting data. step 3/{}. Error: {}".format(model_id, step_count, ex))
+        update_status(
+            model_id,
+            "Failed to complete",
+            "-1/{}".format(step_count), "Error setting data. Issue with input data"
+        )
+        return
+    logger.info("Model ID: {}, Constructing pipeline. step 4/{}".format(model_id, step_count))
+    update_status(model_id, "Constructing pipeline", "4/{}".format(step_count))
+    try:
+        t.set_pipeline()
+    except Exception as ex:
+        logger.warning("Model ID: {}, Error setting data. step 4/{}. Error: {}".format(model_id, step_count, ex))
+        update_status(
+            model_id,
+            "Failed to complete",
+            "-1/{}".format(step_count), "Error setting the pipeline."
+        )
+        return
+    logger.info("Model ID: {}, Saving fitted model. step 5/{}".format(model_id, step_count))
+    update_status(model_id, "Saving fitted model", "5/{}".format(step_count))
+
+    saved = False
+    save_tries = 0
+    err = None
+    while not saved and save_tries < 5:
+        try:
+            amodel = AnalyticalModel.objects.get(id=model_id)
+            amodel.model = pickle.dumps(t.lr_estimator)
+            amodel.save()
+            saved = True
+        except Exception as ex:
+            logger.warning("Error attempting to save pickled model: {}".format(ex))
+            err = ex
+            time.sleep(.5)
+            save_tries += 1
+    if saved:
+        logger.info("Model ID: {}, Completed. step 6/{}".format(model_id, step_count))
+        update_status(model_id, "Complete", "6/{}".format(step_count))
+    else:
+        logger.warning("Model ID: {}, Error pickling model. step 5/{}. Error: {}".format(model_id, step_count, err))
+        update_status(
+            model_id,
+            "Failed to complete",
+            "-1/{}".format(step_count), "Error saving the fitted model"
+        )
 
 
 class LinearRegressionVB:
@@ -132,11 +191,11 @@ class LinearRegressionAutomatedVB:
         # generates the model that is saved
         logger.info("Total execution time: {} sec".format(round(time.time() - self.start_time, 3)))
 
-    def predict(self, x_test=None):
-        # obsolete within dask stack
-        x_test = x_test if x_test else self.x_test
-        self.results = self.lr_estimator.predict(x_test)
-        self.residuals = self.results - self.y_test.to_numpy().flatten()
+    # def predict(self, x_test=None):
+    #     # obsolete within dask stack
+    #     x_test = x_test if x_test else self.x_test
+    #     self.results = self.lr_estimator.predict(x_test)
+    #     self.residuals = self.results - self.y_test.to_numpy().flatten()
 
     def get_info(self):
         details = {
