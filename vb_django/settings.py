@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+import mimetypes
 
 
 print("TESTING NEW CODE")
@@ -26,6 +27,8 @@ SECRET_KEY = 'cdu1aqcu#bw)$d39*r602h@zg1a7()&c(r39y#s5tt6oqq!3je'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+if DEBUG:
+    mimetypes.add_type("application/javascript", ".js", True)
 
 ALLOWED_HOSTS = ['*']
 
@@ -47,11 +50,13 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_extensions',
     'drf_yasg',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -138,8 +143,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'staticfiles')
-STATICFILES_DIRS = (os.path.join(PROJECT_ROOT, 'static'),)
+STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static')
+# STATICFILES_DIRS = (
+#     os.path.join(PROJECT_ROOT, 'static'),
+# )
 
 
 # Django Rest Framework settings
@@ -153,3 +160,5 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     )
 }
+
+CORS_ALLOW_ALL_ORIGINS = True

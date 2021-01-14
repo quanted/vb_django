@@ -1,12 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import api_view
 from rest_framework.authentication import TokenAuthentication
-from drf_yasg.utils import swagger_auto_schema
-from vb_django.models import Location
+from vb_django.models import Location, Project
 from vb_django.serializers import LocationSerializer
-from vb_django.permissions import IsOwner
+from vb_django.permissions import IsOwnerOfProjectChild
+from vb_django.app.metadata import Metadata
 
 
 class LocationView(viewsets.ViewSet):
@@ -15,7 +14,7 @@ class LocationView(viewsets.ViewSet):
     """
     serializer_class = LocationSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated, IsOwnerOfProjectChild]
 
     def list(self, request):
         """
@@ -23,10 +22,19 @@ class LocationView(viewsets.ViewSet):
         :param request: GET request
         :return: List of locations
         """
-        locations = Location.objects.filter(owner_id=request.user)
+        projects = Project.objects.filter(owner_id=request.user)
+        p_ids = []
+        for p in projects:
+            p_ids.append(p.id)
+        locations = Location.objects.filter(project_id__in=p_ids)
         # TODO: Add ACL access objects
         serializer = self.serializer_class(locations, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = serializer.data
+        for l in response_data:
+            loc = Location.objects.get(pk=int(l["id"]))
+            m = Metadata(loc, None)
+            l["metadata"] = m.get_metadata("LocationMetadata")
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def create(self, request):
         """
@@ -34,39 +42,65 @@ class LocationView(viewsets.ViewSet):
         :param request: POST request
         :return: New location object
         """
-        serializer = self.serializer_class(data=request.data, context={'request': request})
+        dataset_inputs = request.data.dict()
+        serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
+        # TODO: Add project existence and ownership check
         if serializer.is_valid():
             location = serializer.save()
+            location_data = serializer.data
+            if "metadata" not in dataset_inputs.keys():
+                dataset_inputs["metadata"] = None
+            m = Metadata(location, dataset_inputs["metadata"])
+            meta = m.set_metadata("LocationMetadata")
+            if meta:
+                location_data["metadata"] = meta
             if location:
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response(location_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
-        serializer = self.serializer_class(data=request.data, context={'request': request})
+        """
+        PUT request to update an existing location.
+        :param request: PUT request
+        :param pk: Location ID
+        :return:
+        """
+        dataset_inputs = request.data.dict()
+        serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid() and pk is not None:
             try:
                 original_location = Location.objects.get(id=int(pk))
             except Location.DoesNotExist:
                 return Response("No location found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwner().has_object_permission(request, self, original_location):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, original_location):
                 location = serializer.update(original_location, serializer.validated_data)
                 if location:
+                    l = serializer.data
+                    m = Metadata(location, dataset_inputs["metadata"])
+                    meta = m.set_metadata("LocationMetadata")
+                    if meta:
+                        l["metadata"] = meta
                     request_status = status.HTTP_201_CREATED
                     if int(pk) == location.id:
                         request_status = status.HTTP_200_OK
-                    return Response(serializer.data, status=request_status)
+                    return Response(l, status=request_status)
             else:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
-        # pk = args['location_id']
+        """
+        DEL request to delete an existing location.
+        :param request: DEL request
+        :param pk: Location ID
+        :return:
+        """
         if pk is not None:
             try:
                 location = Location.objects.get(id=int(pk))
             except Location.DoesNotExist:
                 return Response("No location found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwner().has_object_permission(request, self, location):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, location):
                 location.delete()
                 return Response(status=status.HTTP_200_OK)
             else:

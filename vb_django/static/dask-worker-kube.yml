@@ -1,0 +1,33 @@
+kind: Pod
+metadata:
+  labels:
+    app: dask-worker-spawn
+spec:
+  restartPolicy: Never
+  containers:
+  - image: quanted/vb_dask:latest
+    imagePullPolicy: IfNotPresent
+    args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 2GB, --death-timeout, '60']
+    name: dask-worker-spawn
+    env:
+      - name: EXTRA_PIP_PACKAGES
+        value: git+https://github.com/dask/distributed
+      - name: IN_DOCKER
+        value: "True"
+      - name: DASK_SCHEDULER
+        value: "dask-scheduler:8786"
+    volumeMounts:
+      - mountPath: /app
+        name: vb-dask-volume
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2G
+      requests:
+        cpu: "1"
+        memory: 2G
+  volumes:
+    - name: vb-dask-volume
+      hostPath:
+        path: /host/vb_django
+        type: Directory

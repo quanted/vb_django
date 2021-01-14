@@ -6,7 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from vb_django.models import AnalyticalModel
 from vb_django.app.metadata import Metadata
 from vb_django.serializers import AnalyticalModelSerializer
-from vb_django.permissions import IsOwnerOfWorkflowChild
+from vb_django.permissions import IsOwnerOfProjectChild
 
 
 class AnalyticalModelView(viewsets.ViewSet):
@@ -15,20 +15,25 @@ class AnalyticalModelView(viewsets.ViewSet):
     """
     serializer_class = AnalyticalModelSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOfWorkflowChild]
+    permission_classes = [IsAuthenticated, IsOwnerOfProjectChild]
 
     def list(self, request):
         """
-        GET request that lists all the analytical models for a specific workflow id
-        :param request: GET request, containing the workflow id as 'workflow'
+        GET request that lists all the analytical models for a specific project id
+        :param request: GET request, containing the project id as 'project'
         :return: List of analytical models
         """
-        if 'workflow_id' in self.request.query_params.keys():
-            a_models = AnalyticalModel.objects.filter(workflow_id=int(self.request.query_params.get('workflow_id')))
+        if 'project_id' in self.request.query_params.keys():
+            a_models = AnalyticalModel.objects.filter(project_id=int(self.request.query_params.get('project_id')))
             serializer = self.serializer_class(a_models, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            response_data = serializer.data
+            for l in response_data:
+                a = AnalyticalModel.objects.get(pk=int(l["id"]))
+                m = Metadata(a, None)
+                l["metadata"] = m.get_metadata("ModelMetadata")
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response(
-            "Required 'workflow' parameter for the workflow id was not found.",
+            "Required 'project_id' parameter for the project id was not found.",
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -42,14 +47,15 @@ class AnalyticalModelView(viewsets.ViewSet):
         serializer = self.serializer_class(data=amodel_inputs, context={'request': request})
         if serializer.is_valid():
             serializer.save()
-            amodel_inputs = serializer.data
-            if "metadata" in amodel_inputs.keys():
+            amodel = serializer.data
+            if "metadata" not in amodel_inputs.keys():
                 amodel_inputs["metadata"] = None
-                m = Metadata(amodel_inputs, amodel_inputs["metadata"])
-                meta = m.set_metadata("ModelMetadata")
-                amodel_inputs["metadata"] = m.get_metadata("ModelMetadata")
-            if amodel_inputs:
-                return Response(amodel_inputs, status=status.HTTP_201_CREATED)
+            a = AnalyticalModel.objects.get(pk=int(amodel["id"]))
+            m = Metadata(a, amodel_inputs["metadata"])
+            meta = m.set_metadata("ModelMetadata")
+            amodel["metadata"] = meta
+            if amodel:
+                return Response(amodel, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
@@ -63,7 +69,7 @@ class AnalyticalModelView(viewsets.ViewSet):
                     "No analytical model found for id: {}".format(pk),
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, original_amodel):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, original_amodel):
                 amodel = serializer.update(original_amodel, serializer.validated_data)
                 if amodel:
                     response_status = status.HTTP_201_CREATED
@@ -71,11 +77,11 @@ class AnalyticalModelView(viewsets.ViewSet):
                     response_data["id"] = amodel.id
                     if int(pk) == amodel.id:
                         response_status = status.HTTP_200_OK
-                    if "metadata" in amodel_inputs.keys():
+                    if "metadata" not in amodel_inputs.keys():
                         amodel_inputs["metadata"] = None
-                        m = Metadata(amodel_inputs, amodel_inputs["metadata"])
-                        meta = m.set_metadata("ModelMetadata")
-                        response_data["metadata"] = m.get_metadata("ModelMetadata")
+                    a = AnalyticalModel.objects.get(pk=amodel.id)
+                    m = Metadata(a, amodel_inputs["metadata"])
+                    response_data["metadata"] = m.set_metadata("ModelMetadata")
                     return Response(response_data, status=response_status)
             else:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
@@ -87,7 +93,7 @@ class AnalyticalModelView(viewsets.ViewSet):
                 amodel = AnalyticalModel.objects.get(id=int(pk))
             except AnalyticalModel.DoesNotExist:
                 return Response("No analytical model found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfWorkflowChild().has_object_permission(request, self, amodel):
+            if IsOwnerOfProjectChild().has_object_permission(request, self, amodel):
                 amodel.delete()
                 return Response(status=status.HTTP_200_OK)
             else:
