@@ -27,11 +27,11 @@ class ProjectView(viewsets.ViewSet):
 
     def list(self, request, pk=None):
         """
-        GET request that lists all the projects for a specific location id
+        GET request that lists all the projects
         :param request: GET request
         :return: List of projects
         """
-        projects = Project.objects.filter(owner_id=request.user)
+        projects = Project.objects.filter(owner=request.user)
         # TODO: Add ACL access objects
         serializer = self.serializer_class(projects, many=True)
         response_data = serializer.data

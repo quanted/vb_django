@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from vb_django.models import AnalyticalModel, Location
+from vb_django.models import Project, Model
 
 
 class IsOwner(permissions.BasePermission):
@@ -7,23 +7,35 @@ class IsOwner(permissions.BasePermission):
     Checks if the user ia the owner of the object.
     """
     def has_object_permission(self, request, view, obj):
-        return obj.owner_id == request.user
+        return obj.owner == request.user
 
 
-class IsOwnerOfProjectChild(permissions.BasePermission):
+class IsOwnerOfProject(permissions.BasePermission):
     """
-    Checks if the user is the owner of the parent project
-    """
-    def has_object_permission(self, request, view, obj):
-        return obj.project.owner_id == request.user
-
-
-class IsOwnerOfAnalyticalModelChild(permissions.BasePermission):
-    """
-    Checks if the user is the owner of the analytical model's parent project.
+    Checks if the user is the owner of some specified project
     """
     def has_object_permission(self, request, view, obj):
-        return obj.analytical_model.project.owner_id == request.user
+        try:
+            project = Project.objects.filter(id=obj.id)
+        except Project.DoesNotExist:
+            return False
+        return project.owner == request.user
+
+
+class IsOwnerOfExperiment(permissions.BasePermission):
+    """
+    Checks if the user is the owner of the experiment's project
+    """
+    def has_object_permission(self, request, view, obj):
+        return obj.project.owner == request.user
+
+
+class IsOwnerOfModel(permissions.BasePermission):
+    """
+    Checks if the user is the owner of the project for the model of this experiment
+    """
+    def has_object_permission(self, request, view, obj):
+        return obj.model.experiement.project.owner == request.user
 
 
 class HasModelIntegrity(permissions.BasePermission):
@@ -32,7 +44,7 @@ class HasModelIntegrity(permissions.BasePermission):
     """
     def has_object_permission(self, request, view, obj):
         existing_model = False
-        models = AnalyticalModel.objects.filter(workflow__location__id=obj.id)
+        models = Model.objects.filter(experiment=obj)
         for m in models:
             if m.model is not None:
                 existing_model = True

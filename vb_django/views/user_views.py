@@ -48,3 +48,19 @@ class UserView(views.APIView):
                 data["token"] = token.key
                 return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserResetView(views.APIView):
+    """
+    User reset password view.
+    """
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    @csrf_exempt
+    def post(self, request):
+        """
+        Register a new user.
+        :param request: Request body should contain 'username', 'email'
+        :return: TODO
+        """
+        return Response(None, status=status.HTTP_501_NOT_IMPLEMENTED)

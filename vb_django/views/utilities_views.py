@@ -2,9 +2,9 @@ from vb_django.app.linear_regression import LinearRegressionAutomatedVB
 from django.http import HttpResponse, JsonResponse
 
 
-def analytical_model_details(request):
+def pipeline_details(request):
     """
-    Returns the details for each of the implemented analytical models and their corresponding hyperparameters
+    Returns the details for each of the implemented pipelines and their corresponding hyper-parameters
     """
     details = []
 

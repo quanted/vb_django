@@ -1,10 +1,11 @@
 import vb_django.dask_django
 from dask.distributed import Client, fire_and_forget
-from vb_django.models import Dataset, AnalyticalModel
+from vb_django.models import Dataset, Experiment
 from io import StringIO
 from vb_django.app.linear_regression import execute_lra
 from vb_django.app.metadata import Metadata
 from vb_django.utilities import update_status
+from vb_django.app.linear_regression import LinearRegressionAutomatedVB
 from dask import delayed
 from dask_kubernetes import KubeCluster
 import pickle
@@ -16,13 +17,13 @@ import logging
 import time
 
 
+# TODO: REFACTOR
+
 logger = logging.getLogger("vb_dask")
 logger.setLevel(logging.INFO)
 
 dask_scheduler = os.getenv("DASK_SCHEDULER", "tcp://" + socket.gethostbyname(socket.gethostname()) + ":8786")
 target = "Response"
-
-step_count = {"lra": 6}
 
 
 class DaskTasks:
@@ -31,25 +32,13 @@ class DaskTasks:
     def setup_task(dataset_id, amodel_id, prepro_id=None):
 
         dataset = Dataset.objects.get(id=int(dataset_id))
-        amodel = AnalyticalModel.objects.get(id=int(amodel_id))
-        amodel.dataset = dataset.id
-        amodel.save()
-
-        in_kube = bool(int(os.getenv("IN_KUBE", 0)))
-        if in_kube:
-            logger.info("CWD: {}".format(os.getcwd()))
-            cluster = KubeCluster.from_yaml(os.path.join("vb_django", "vb_django", "static", "dask-worker-kube.yml"))
-            cluster.adapt(minimum=int(os.getenv("IN_KUBE_N_MIN", 1)), maximum=int(os.getenv("IN_KUBE_N_MAX", 10)))
-            # dask_host = dask_scheduler.split(":")
-            # cluster._deploy_mode = "remote"
-            # cluster.host = dask_host[0]
-            # cluster.port = int(dask_host[1])
-            client = Client(cluster)
-        else:
-            client = Client(dask_scheduler)
+        experiment = Experiment.objects.get(id=int(amodel_id))
+        experiment.dataset = dataset.id
+        experiment.save()
+        client = Client(dask_scheduler)
         df = pd.read_csv(StringIO(bytes(dataset.data).decode())).drop("ID", axis=1)
         # add preprocessing to task
-        fire_and_forget(client.submit(DaskTasks.execute_task, df, int(amodel.id), str(amodel.name), int(dataset_id)))
+        fire_and_forget(client.submit(DaskTasks.execute_task, df, int(experiment.id), str(experiment.name), int(dataset_id)))
         #DaskTasks.execute_task(df, int(amodel.id), str(amodel.name), int(dataset_id))
 
     @staticmethod
@@ -69,28 +58,14 @@ class DaskTasks:
 
         logger.info("Model ID: {}, loading hyper-parameters step 2/{}".format(model_id, step_count[model_name]))
         update_status(model_id, "Loading hyper-parameters", "2/{}".format(step_count[model_name]))
-        parameters = Metadata(parent=AnalyticalModel.objects.get(id=model_id)).get_metadata("ModelMetadata")
+        parameters = Metadata(parent=Experiment.objects.get(id=model_id)).get_metadata("ModelMetadata")
 
         if model_name == "lra":
             execute_lra(model_id, parameters, x, y, step_count[model_name])
 
-
-    # @staticmethod
-    # def update_status(_id, status, stage, message=None, retry=5):
-    #     if retry == 0:
-    #         pass
-    #     meta = 'ModelMetadata'
-    #     try:
-    #         amodel = AnalyticalModel.objects.get(id=int(_id))
-    #         m = Metadata(parent=amodel, metadata=json.dumps({"status": status, "stage": stage, "message": message}))
-    #         m.set_metadata(meta)
-    #     except Exception as ex:
-    #         logger.warning("Error attempting to save metadata update: {}".format(ex))
-    #         DaskTasks.update_status(_id, status, stage, None, retry-1)
-
     @staticmethod
     def make_prediction(amodel_id, data=None):
-        amodel = AnalyticalModel.objects.get(id=int(amodel_id))
+        amodel = Experiment.objects.get(id=int(amodel_id))
         dataset = Dataset.objects.get(id=int(amodel.dataset))
         y_data = None
 

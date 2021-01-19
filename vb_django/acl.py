@@ -1,4 +1,4 @@
-from vb_django.models import Location, Workflow, Dataset, AnalyticalModel, AccessControlList
+from vb_django.models import Location, Project, Dataset, Experiment, AccessControlList
 import datetime
 
 
@@ -56,8 +56,8 @@ class Authorization:
                 return l.owner
             else:
                 return None
-        elif object_type == "Workflow":
-             w = Workflow.objects.filter(id=object_id)
+        elif object_type == "Project":
+             w = Project.objects.filter(id=object_id)
              if w is not None:
                  return w.location.owner
              else:
@@ -68,8 +68,8 @@ class Authorization:
                 return d.workflow.location.owner
             else:
                 return None
-        elif object_type == "AnalyticalModel":
-            am = AnalyticalModel.objects.filter(id=object_id)
+        elif object_type == "Experiment":
+            am = Experiment.objects.filter(id=object_id)
             if am is not None:
                 return am.workflow.location.owner
             else:
@@ -86,12 +86,12 @@ class Authorization:
         """
         if object_type == "Location":
             return self.check_location(user, object_id)
-        elif object_type == "Workflow":
-            return self.check_workflow(user, object_id)
+        elif object_type == "Project":
+            return self.check_project(user, object_id)
         elif object_type == "Dataset":
             return self.check_dataset(user, object_id)
-        elif object_type == "AnalyticalModel":
-            return self.check_analyticalmodel(user, object_id)
+        elif object_type == "Experiment":
+            return self.check_experiment(user, object_id)
         else:
             return False
 
@@ -113,7 +113,7 @@ class Authorization:
             # has_access = True
         return has_access
 
-    def check_workflow(self, user, id):
+    def check_project(self, user, id):
         """
         Run authorization check on the Workflow resource
         :param user: Current user
@@ -121,10 +121,10 @@ class Authorization:
         :return: True if user has access, False if denied access
         """
         has_access = False
-        workflow = Workflow.objects.filter(id=id)
+        workflow = Project.objects.filter(id=id)
         if workflow.location.owner == user:
             has_access = True
-        workflow_acl = AccessControlList.objects.filter(target_user=user.id, object_type="Workflow", object_id=id)
+        workflow_acl = AccessControlList.objects.filter(target_user=user.id, object_type="project", object_id=id)
         # if workflow_acl is not None:
             # current_dt = datetime.datetime.now()
             # TODO: Add expiration check, if expiration is < than now() deny access and remove entry from ACL
@@ -149,7 +149,7 @@ class Authorization:
             # has_access = True
         return has_access
 
-    def check_analyticalmodel(self, user, id):
+    def check_experiment(self, user, id):
         """
         Run authorization check on the Analytical Model resource
         :param user: Current user
@@ -157,10 +157,10 @@ class Authorization:
         :return: True if user has access, False if denied access
         """
         has_access = False
-        am = AnalyticalModel.objects.filter(id=id)
+        am = Experiment.objects.filter(id=id)
         if am.workflow.location.owner == user:
             has_access = True
-        am_acl = AccessControlList.objects.filter(target_user=user.id, object_type="AnalyticalModel", object_id=id)
+        am_acl = AccessControlList.objects.filter(target_user=user.id, object_type="Experiment", object_id=id)
         # if dataset_acl is not None:
             # current_dt = datetime.datetime.now()
             # TODO: Add expiration check, if expiration is < than now() deny access and remove entry from ACL

@@ -7,7 +7,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, LogMinus_T, Exp
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.utilities import update_status
-from vb_django.models import Dataset, AnalyticalModel
+from vb_django.models import Dataset, Model
 
 import pandas as pd
 import numpy as np
@@ -16,8 +16,8 @@ import time
 import logging
 import pickle
 
-from sklearn.utils.testing import ignore_warnings
-from sklearn.exceptions import ConvergenceWarning
+#from sklearn.utils.testing import ignore_warnings
+#from sklearn.exceptions import ConvergenceWarning
 
 logger = logging.getLogger("vb_dask")
 logger.setLevel(logging.INFO)
@@ -60,7 +60,7 @@ def execute_lra(model_id, parameters, x, y, step_count):
     err = None
     while not saved and save_tries < 5:
         try:
-            amodel = AnalyticalModel.objects.get(id=model_id)
+            amodel = Model.objects.get(id=model_id)
             amodel.model = pickle.dumps(t.lr_estimator)
             amodel.save()
             saved = True
@@ -151,7 +151,7 @@ class LinearRegressionAutomatedVB:
         self.n, self.k = self.x_train.shape
         self.max_k = min([self.n // 2, int(1.5 * self.k)])
 
-    @ignore_warnings(category=ConvergenceWarning)
+    #@ignore_warnings(category=ConvergenceWarning)
     def set_pipeline(self):
         warnings.filterwarnings('ignore')
         gridpoints = self.gridpoints

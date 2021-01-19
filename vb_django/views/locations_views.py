@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from vb_django.models import Location, Project
 from vb_django.serializers import LocationSerializer
-from vb_django.permissions import IsOwnerOfProjectChild
+from vb_django.permissions import IsOwnerOfProject
 from vb_django.app.metadata import Metadata
 
 
@@ -14,7 +14,7 @@ class LocationView(viewsets.ViewSet):
     """
     serializer_class = LocationSerializer
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsOwnerOfProjectChild]
+    permission_classes = [IsAuthenticated, IsOwnerOfProject]
 
     def list(self, request):
         """
@@ -22,11 +22,7 @@ class LocationView(viewsets.ViewSet):
         :param request: GET request
         :return: List of locations
         """
-        projects = Project.objects.filter(owner_id=request.user)
-        p_ids = []
-        for p in projects:
-            p_ids.append(p.id)
-        locations = Location.objects.filter(project_id__in=p_ids)
+        locations = Location.objects.filter(owner=request.user)
         # TODO: Add ACL access objects
         serializer = self.serializer_class(locations, many=True)
         response_data = serializer.data
@@ -72,7 +68,7 @@ class LocationView(viewsets.ViewSet):
                 original_location = Location.objects.get(id=int(pk))
             except Location.DoesNotExist:
                 return Response("No location found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfProjectChild().has_object_permission(request, self, original_location):
+            if original_location.owner == request.user:
                 location = serializer.update(original_location, serializer.validated_data)
                 if location:
                     l = serializer.data
@@ -100,7 +96,7 @@ class LocationView(viewsets.ViewSet):
                 location = Location.objects.get(id=int(pk))
             except Location.DoesNotExist:
                 return Response("No location found for id: {}".format(pk), status=status.HTTP_400_BAD_REQUEST)
-            if IsOwnerOfProjectChild().has_object_permission(request, self, location):
+            if location.owner == request.user:
                 location.delete()
                 return Response(status=status.HTTP_200_OK)
             else:

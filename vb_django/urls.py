@@ -15,20 +15,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include, re_path
-from django.contrib.staticfiles.views import serve
-# from django.views.generic import TemplateView
 from rest_framework import permissions, routers
 from drf_yasg.views import get_schema_view
-# from rest_framework.schemas import get_schema_view
 from drf_yasg import openapi
 from .landing import landing, asset_redirect
-from vb_django.views.user_views import UserView, UserLoginView
+from vb_django.views.user_views import UserView, UserLoginView, UserResetView
 from vb_django.views.locations_views import LocationView
 from vb_django.views.project_views import ProjectView
-from vb_django.views.analytical_model_views import AnalyticalModelView
+from vb_django.views.experiment_views import ExperimentView
 from vb_django.views.dataset_views import DatasetView
-from vb_django.views.preprocessing_views import PreProcessingConfigView
-from vb_django.views.utilities_views import analytical_model_details
+from vb_django.views.utilities_views import pipeline_details
 
 
 router = routers.SimpleRouter()
@@ -36,12 +32,10 @@ router = routers.SimpleRouter()
 router.register('location', LocationView, basename='location')
 # --------- Project API endpoints ---------- #
 router.register('project', ProjectView, basename='project')
-# ------ Analytical Model API endpoints ------ #
-router.register('analyticalmodel', AnalyticalModelView, basename='analyticalmodel')
+# ------ Experiment API endpoints ------ #
+router.register('experiment', ExperimentView, basename='experiment')
 # --------- Dataset API endpoints ---------- #
 router.register('dataset', DatasetView, basename='dataset')
-# --------- PreprocessingConfig API API endpoints ---------- #
-router.register('preprocessing', PreProcessingConfigView, basename='preprocessing')
 
 
 schema_view = get_schema_view(
@@ -55,29 +49,24 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
-
 urlpatterns = [
     path('', landing),
     re_path(r'^assets/*', asset_redirect),      # additional statics files
     path('admin/', admin.site.urls),
 
     # ----------- Swagger Docs/UI ------------- #
-    # path('swagger/', TemplateView.as_view(
-    #     template_name='swagger-ui.html',
-    #     extra_context={'schema_url': 'openapi-schema'}
-    # ), name='swagger-ui'),
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    # path('swagger/', schema_view, name='openapi-schema'),
 
     # ---------- User API endpoints ----------- #
-    path('api/user/login/', UserLoginView.as_view()),                           # POST
-    path('api/user/register/', UserView.as_view()),       # POST
+    path('api/user/login/', UserLoginView.as_view()),                           # POST - Login
+    path('api/user/register/', UserView.as_view()),                             # POST - Register
+    path('api/user/reset/', UserResetView.as_view()),                           # POST - Password reset
 
     # ------ ADD the DRF urls registered to the router ------ #
     path('api/', include(router.urls)),
 
-    path('info/analyticalmodels/', analytical_model_details),
+    path('info/pipelines/', pipeline_details),
 
 ]
 

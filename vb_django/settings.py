@@ -14,7 +14,7 @@ import os
 import mimetypes
 
 
-print("TESTING NEW CODE")
+print("Starting vb django applications")
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -29,8 +29,10 @@ SECRET_KEY = 'cdu1aqcu#bw)$d39*r602h@zg1a7()&c(r39y#s5tt6oqq!3je'
 DEBUG = True
 if DEBUG:
     mimetypes.add_type("application/javascript", ".js", True)
+print("DEBUG: {}".format(DEBUG))
 
 ALLOWED_HOSTS = ['*']
+print("ALLOWED_HOSTS: {}".format(ALLOWED_HOSTS))
 
 APPEND_SLASH = True
 
@@ -89,6 +91,7 @@ WSGI_APPLICATION = 'vb_django.wsgi.application'
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 print("IN_DOCKER: {}".format(IN_DOCKER))
 if IN_DOCKER == "false":
+    print("DATABASE: {}".format(os.path.join(BASE_DIR, 'db.sqlite3')))
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -96,6 +99,7 @@ if IN_DOCKER == "false":
         }
     }
 else:
+    print("DATABASE: vb_postgres:5432")
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',

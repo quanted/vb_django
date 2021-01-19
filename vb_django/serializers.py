@@ -1,10 +1,8 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-# import vb_django.vb_django.models as vb_models
-# from vb_django.validation import Validator
-from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, AnalyticalModel, Location, \
-    LocationMetadata, PreProcessingConfig, ModelResults, ModelMetadata, AccessControlList
+from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, Experiment, Location, \
+    LocationMetadata, ExperimentMetadata, Model, ModelMetadata, AccessControlList, Pipeline, PipelineParameters
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -27,60 +25,31 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LocationSerializer(serializers.ModelSerializer):
-    project_id = serializers.PrimaryKeyRelatedField(read_only=True)
-
-    # def validate_points(self, validated_data):
-    #     validated = True
-    #     if not Validator.validate_point(validated_data["start_latitude"], validated_data["start_longitude"]):
-    #         self.errors["start_point"] = "Start point coordinates, start_latitude/start_longitude, are invalid"
-    #         validated = False
-    #     if not Validator.validate_point(validated_data["end_latitude"], validated_data["end_longitude"]):
-    #         self.errors["end_point"] = "End point coordinates, end_latitude/end_longitude, are invalid"
-    #         validated = False
-    #     if not Validator.validate_point(validated_data["o_latitude"], validated_data["o_longitude"]):
-    #         self.errors["o_point"] = "Orientation point coordinates, o_latitude/o_longitude, are invalid"
-    #         validated = False
-    #     return validated
-    #
-    def check_integrity(self, location):
-        can_update = True
-        # a_models = AnalyticalModel.objects.filter(location_id=location.id)
-        a_models = []
-        for m in a_models:
-            if m.model is not None:
-                can_update = False
-        return can_update
+    owner = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
 
     def create(self, validated_data):
         location = None
-        # validated = self.validate_points(validated_data)
         validated = True
         if validated:
             location = Location(**validated_data)
-            location.project = Project.objects.filter(id=int(self.context["request"].data["project_id"]))[0]
+            location.owner = self.context["request"].user
             location.save()
         return location
 
     def update(self, instance, validated_data):
         location = instance
-        # validated = self.validate_points(validated_data)
         validated = True
         if validated:
-            can_update = self.check_integrity(instance)
-            if can_update:
-                location = Location(**validated_data)
-                location.project = instance.project
-                location.id = instance.id
-                location.save()
-            else:
-                location = Location(**validated_data)
-                location.save()
+            location = Location(**validated_data)
+            location.id = instance.id
+            location.owner = self.context["request"].user
+            location.save()
         return location
 
     class Meta:
         model = Location
         fields = [
-            "id", "project_id", "name", "description", "type"
+            "id", "owner", "name", "description", "type"
         ]
 
 
@@ -88,39 +57,30 @@ class LocationMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocationMetadata
         fields = [
-            "id", "parent_id", "name", "value"
+            "id", "parent", "name", "value"
         ]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    owner_id = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
+    owner = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
 
     def create(self, validated_data):
         project = Project(**validated_data)
-        project.owner_id = self.context["request"].user
+        project.owner = self.context["request"].user
         project.save()
         return project
-
-    def check_integrity(self, workflow):
-        can_update = True
-        # a_models = AnalyticalModel.objects.filter(workflow__id=workflow.id)
-        a_models = []
-        for m in a_models:
-            if m.model is not None:
-                can_update = False
-        return can_update
 
     def update(self, instance, validated_data):
         project = Project(**validated_data)
         project.id = instance.id
-        project.owner_id = instance.owner_id
+        project.owner = instance.owner
         project.save()
         return project
 
     class Meta:
         model = Project
         fields = [
-            "id", "owner_id", "name", "description"
+            "id", "owner", "location", "name", "description"
         ]
 
 
@@ -128,28 +88,19 @@ class ProjectMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectMetadata
         fields = [
-            "id", "parent_id", "name", "value"
+            "id", "parent", "name", "value"
         ]
 
 
 class DatasetSerializer(serializers.ModelSerializer):
-    owner_id = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
+    owner = serializers.PrimaryKeyRelatedField(read_only=True, default=serializers.CurrentUserDefault())
     data = serializers.CharField()
-
-    def check_integrity(self, project):
-        can_update = True
-        # a_models = AnalyticalModel.objects.filter(workflow_id=workflow.id)
-        a_models = []
-        for m in a_models:
-            if m.model is not None:
-                can_update = False
-        return can_update
 
     def create(self, validated_data):
         if "data" in validated_data.keys():
             validated_data["data"] = str(validated_data["data"]).encode()
         dataset = Dataset(**validated_data)
-        dataset.owner_id = self.context["request"].user
+        dataset.owner = self.context["request"].user
         dataset.save()
         return dataset
 
@@ -157,16 +108,15 @@ class DatasetSerializer(serializers.ModelSerializer):
         if "data" in validated_data.keys():
             validated_data["data"] = str(validated_data["data"]).encode()
         dataset = Dataset(**validated_data)
-        # if self.check_integrity(dataset.owner_id):
         dataset.id = instance.id
-        dataset.owner_id = instance.owner_id
+        dataset.owner = instance.owner
         dataset.save()
         return dataset
 
     class Meta:
         model = Dataset
         fields = [
-            "id", "owner_id", "location_id", "name", "description", "data"
+            "id", "owner", "name", "description", "data"
         ]
 
 
@@ -174,54 +124,120 @@ class DatasetMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = DatasetMetadata
         fields = [
-            "id", "parent_id", "name", "value"
+            "id", "parent", "name", "value"
         ]
 
 
-class AnalyticalModelSerializer(serializers.ModelSerializer):
-    project_id = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
+class ExperimentSerializer(serializers.ModelSerializer):
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
 
     def create(self, validated_data):
-        amodel = AnalyticalModel(**validated_data)
-        amodel.project_id = amodel.project_id.id
-        amodel.save()
-        return amodel
+        experiment = Experiment(**validated_data)
+        experiment.save()
+        return experiment
 
     def update(self, instance, validated_data):
-        amodel = AnalyticalModel(**validated_data)
-        if instance.model is None:
-            amodel.id = instance.id
-        amodel.project_id = instance.project_id
-        amodel.save()
-        return amodel
+        experiment = Experiment(**validated_data)
+        try:
+            models = Model.objects.get(experiment=experiment)
+        except Model.DoesNotExist:
+            experiment.id = instance.id
+        experiment.project = instance.project
+        experiment.save()
+        return experiment
 
     class Meta:
-        model = AnalyticalModel
+        model = Experiment
         fields = [
-            "id", "project_id", "name", "type", "description", "variables"
+            "id", "project", "name", "type", "description"
         ]
 
 
-class PreProcessingConfigSerializer(serializers.ModelSerializer):
+class ExperimentMetadataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExperimentMetadata
+        fields = [
+            "id", "parent", "name", "value"
+        ]
+
+
+class ModelSerializer(serializers.ModelSerializer):
+    experiment = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    def create(self, validated_data):
+        model = Model(**validated_data)
+        model.save()
+        return model
+
+    def update(self, instance, validated_data):
+        model = Model(**validated_data)
+        if instance.model is None:
+            model.id = instance.id
+        model.save()
+        return model
 
     class Meta:
-        model = PreProcessingConfig
-        fields = ["analytical_model", "id", "name", "config"]
+        model = Model
+        fields = [
+            "id", "project", "name", "description"
+        ]
 
 
 class ModelMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelMetadata
         fields = [
-            "id", "parent_id", "name", "value"
+            "id", "parent", "name", "value"
         ]
 
 
-class ModelResultsSerializer(serializers.ModelSerializer):
+class PipelineSerializer(serializers.ModelSerializer):
+    def create(self, validated_data):
+        pipeline = Pipeline(**validated_data)
+        pipeline.save()
+        return pipeline
+
+    def update(self, instance, validated_data):
+        pipeline = Pipeline(**validated_data)
+        if instance.model is None:
+            pipeline.id = instance.id
+        pipeline.save()
+        return pipeline
+
     class Meta:
-        model = ModelResults
+        model = Model
         fields = [
-            "id", "model_id", "dataset_id", "timestamp", "result"
+            "id", "name", "active", "description"
+        ]
+
+
+class PipelineParameterSerializer(serializers.ModelSerializer):
+    pipeline = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    def create(self, validated_data):
+        pipelinep = PipelineParameters(**validated_data)
+        pipelinep.save()
+        return pipelinep
+
+    def update(self, instance, validated_data):
+        pipelinep = PipelineParameters(**validated_data)
+        if instance.model is None:
+            pipelinep.id = instance.id
+        pipelinep.save()
+        return pipelinep
+
+    class Meta:
+        model = Model
+        fields = [
+            "id", "name", "vtype", "type", "value", "options"
+        ]
+
+
+class PipelineMetadataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModelMetadata
+        fields = [
+            "id", "parent", "name", "value"
         ]
 
 
@@ -229,5 +245,5 @@ class AccessControlListSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccessControlList
         fields = [
-            "owner_id", "target_user_id", "object_id", "object_type", "expiration", "access_type"
+            "owner", "target_user", "object", "object_type", "expiration", "access_type"
         ]

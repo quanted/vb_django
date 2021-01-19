@@ -15,11 +15,11 @@ class Metadata:
         if names:
             metadata = []
             for n in names:
-                m = metadata_model.objects.filter(parent_id=self.parent, name=n).values()
+                m = metadata_model.objects.filter(parent=self.parent, name=n).values()
                 if len(m) > 0:
                     metadata.append(m[0])
         else:
-            metadata = metadata_model.objects.filter(parent_id=self.parent).values()
+            metadata = metadata_model.objects.filter(parent=self.parent).values()
         meta = {}
         for m in metadata:
             meta[m['name']] = m['value']
@@ -33,9 +33,9 @@ class Metadata:
                 v = json.dumps(v)
             elif type(v) != str:
                 v = str(v)
-            current_metadata = metadata_model.objects.filter(parent_id=self.parent, name=k)
+            current_metadata = metadata_model.objects.filter(parent=self.parent, name=k)
             if len(current_metadata) == 0:
-                meta = metadata_model.objects.create(parent_id=self.parent, name=k, value=v)
+                meta = metadata_model.objects.create(parent=self.parent, name=k, value=v)
                 meta.save()
             else:
                 current_metadata[0].value = v
@@ -48,8 +48,8 @@ class Metadata:
         if names:
             metadata = []
             for n in names:
-                metadata.append(metadata_model.objects.filter(parent_id=self.parent, name=n))
+                metadata.append(metadata_model.objects.filter(parent=self.parent, name=n))
         else:
-            metadata = metadata_model.objects.filter(parent_id=self.parent)
+            metadata = metadata_model.objects.filter(parent=self.parent)
         for m in metadata:
             m.delete()
