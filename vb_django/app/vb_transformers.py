@@ -1,8 +1,54 @@
 import logging
 import pandas as pd
 import numpy as np
+import warnings
 from sklearn.linear_model import ElasticNet, Lars
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import f_regression
+
+
+class ColumnBestTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, float_k=None):
+        self.logger = logging.getLogger()
+        self.transform_funcs = {
+            'abs_ln': lambda x: np.log(np.abs(x) + .0000001),
+            'exp': lambda x: np.exp(x / 100),
+            'recip': lambda x: (x + .000000001) ** -1,
+            'none': lambda x: x,
+            'exp_inv': lambda x: np.exp(x) ** -1
+        }
+        self.float_k = float_k
+
+    def fit(self, X, y=None):
+        if not self.float_k is None:
+            Xn = X[:, :self.float_k]
+        else:
+            Xn = X
+        self.k_ = Xn.shape[1]
+        pvals = []
+        self.logger.info(f'Xn.shape:{Xn.shape},Xn:{Xn}')
+        for fn in self.transform_funcs.values():
+            TXn = fn(Xn)
+            try:
+                F, p = f_regression(TXn, y)
+            except:
+                self.logger.exception(f'error doing f_regression')
+                p = np.array([10000.] * TXn.shape[1])
+            pvals.append(p[None, :])
+
+        pval_stack = np.concatenate(pvals, axis=0)  # each row is a transform
+        bestTloc = np.argsort(pval_stack, axis=0)[0, :]
+        Ts = list(self.transform_funcs.keys())
+        self.bestTlist = [Ts[i] for i in bestTloc]
+        self.logger.info(f'bestTlist:{self.bestTlist},')
+        T_s = list(self.transform_funcs.keys())
+        self.best_T_ = [T_s[loc] for loc in bestTloc]
+        return self
+
+    def transform(self, X):
+        for c, t in enumerate(self.best_T_):
+            X[:, c] = self.transform_funcs[t](X[:, c])
+        return X
 
 
 class DropConst(BaseEstimator, TransformerMixin):
@@ -24,24 +70,44 @@ class DropConst(BaseEstimator, TransformerMixin):
         else:
             return X[:, self.unique_ > 1]
 
+    def get_feature_name(self, input_features=None):
+        if input_features is None:
+            input_features = [f'var_{i}' for i in range(len(self.unique_))]
+        return [input_features[i] for i, count in enumerate(self.unique_) if count > 1]
+
 
 class ShrinkBigKTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, max_k=500, selector=None):
+    def __init__(self, max_k=None, k_share=None, selector=None):
         self.logger = logging.getLogger()
         self.max_k = max_k
+        self.k_share = k_share
         self.selector = selector
+
+    def get_feature_name(self, input_features=None):
+        if input_features is None:
+            input_features = [f'var_{i}' for i in range(len(self.k_))]
+        return [input_features[i] for i in self.col_select_]
 
     def fit(self, X, y):
         assert not y is None, f'y:{y}'
+        k = X.shape[1]
+        self.k_ = k
+        if self.max_k is None:
+            if self.k_share is None:
+                self.max_k = 500
+            else:
+                self.max_k = int(k * self.k_share)
+
         if self.selector is None:
             self.selector = 'Lars'
         if self.selector == 'Lars':
             selector = Lars(fit_intercept=1, normalize=1, n_nonzero_coefs=self.max_k)
         elif self.selector == 'elastic-net':
-            selector = ElasticNet(fit_intercept=True, selection='random', tol=0.1, max_iter=500, warm_start=0)
+            selector = ElasticNet(fit_intercept=True, selection='random', tol=0.001, max_iter=5000, warm_start=1,
+                                  random_state=0)
         else:
             selector = self.selector
-        k = X.shape[1]
+
         selector.fit(X, y)
         self.col_select_ = np.arange(k)[np.abs(selector.coef_) > 0.0001]
         if self.col_select_.size < 1:
@@ -84,19 +150,32 @@ class LogP1_T(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         X[X < -self.min_shift_] = -self.min_shift_  # added to avoid np.log(neg), really np.log(<1) b/c 0+1=1
         XT = np.log1p(X + self.min_shift_)
-        # self.logger.info(f'logp1_T transforming XT nulls:{np.isnan(XT).sum()}')
         return XT
 
     def inverse_transform(self, X, y=None):
         XiT = np.expm1(X) - self.min_shift_
-        # self.logger.info(f'logp1_T inv transforming XiT nulls:{np.isnan(XiT).sum()}')
         try:
             infinites = XiT.size - np.isfinite(XiT).sum()
         except:
             self.logger.exception(f'type(XiT):{type(XiT)}')
-        # self.logger.info(f'logp1_T inv transforming XiT not finite count:{infinites}')
         XiT[~np.isfinite(XiT)] = 10 ** 50
         return XiT
+
+
+class Log_T(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        XT = np.zeros(X.shape)
+        XT[X > 0] = np.log(X[X > 0])
+        return XT
+
+    def inverse_transform(self, X, y=None):
+        return np.exp(X)
 
 
 class LogMinus_T(BaseEstimator, TransformerMixin):
@@ -134,6 +213,7 @@ class None_T(BaseEstimator, TransformerMixin):
         pass
 
     def fit(self, X, y=None):
+        self.k_ = X.shape[1]
         return self
 
     def transform(self, X):
@@ -141,3 +221,8 @@ class None_T(BaseEstimator, TransformerMixin):
 
     def inverse_transform(self, X):
         return X
+
+    def get_feature_name(self, input_features=None):
+        if input_features is None:
+            input_features = [f'var_{i}' for i in range(len(self.k_))]
+        return input_features

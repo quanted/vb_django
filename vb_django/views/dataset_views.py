@@ -9,6 +9,7 @@ from vb_django.app.metadata import Metadata
 from vb_django.app.statistics import DatasetStatistics
 from io import StringIO
 import pandas as pd
+from vb_django.utilities import load_dataset
 
 
 class DatasetView(viewsets.ViewSet):
@@ -54,7 +55,7 @@ class DatasetView(viewsets.ViewSet):
             if meta:
                 response_data["metadata"] = meta
                 response = meta["response"]
-            response_data["data"] = pd.read_csv(StringIO(bytes(dataset.data).decode()))
+            response_data["data"] = load_dataset(pk)
             if response not in response_data["data"]:
                 response = response_data["data"].columns.tolist()[0]
             response_data["statistics"] = DatasetStatistics(response_data["data"]).calculate_statistics(response)
@@ -86,7 +87,7 @@ class DatasetView(viewsets.ViewSet):
                 if meta:
                     dataset["metadata"] = meta
                     response = meta["response"]
-                data = pd.read_csv(StringIO(bytes(d.data).decode()))
+                data = load_dataset(d.id)
                 if response not in data:
                     response = data.columns.tolist()[0]
                 dataset["statistics"] = DatasetStatistics(data).calculate_statistics(response)

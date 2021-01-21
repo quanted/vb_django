@@ -4,6 +4,7 @@ from rest_framework.validators import UniqueValidator
 from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, Pipeline, Location, \
     LocationMetadata, PipelineMetadata, Model, ModelMetadata, AccessControlList, PipelineInstance, \
     PipelineInstanceParameters, PipelineInstanceMetadata
+from vb_django.utilities import save_dataset, load_dataset
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -99,7 +100,7 @@ class DatasetSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         if "data" in validated_data.keys():
-            validated_data["data"] = str(validated_data["data"]).encode()
+            validated_data["data"] = save_dataset(str(validated_data["data"]))
         dataset = Dataset(**validated_data)
         dataset.owner = self.context["request"].user
         dataset.save()
@@ -107,7 +108,7 @@ class DatasetSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         if "data" in validated_data.keys():
-            validated_data["data"] = str(validated_data["data"]).encode()
+            validated_data["data"] = save_dataset(str(validated_data["data"]))
         dataset = Dataset(**validated_data)
         dataset.id = instance.id
         dataset.owner = instance.owner

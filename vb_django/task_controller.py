@@ -1,10 +1,9 @@
 from dask.distributed import Client, fire_and_forget
 from vb_django.models import Project, Dataset, Pipeline, Model
 from io import StringIO
-from vb_django.app.linear_regression import execute_lra
 from vb_django.app.metadata import Metadata
-from vb_django.utilities import update_status
-from vb_django.app.linear_regression import LinearRegressionAutomatedVB
+from vb_django.utilities import update_status, load_dataset
+from vb_django.app.elasticnet import ENet
 from dask import delayed
 import pickle
 import pandas as pd
@@ -14,8 +13,6 @@ import socket
 import logging
 import time
 
-
-# TODO: REFACTOR
 
 logger = logging.getLogger("vb_dask")
 logger.setLevel(logging.INFO)
@@ -28,73 +25,86 @@ class DaskTasks:
 
     @staticmethod
     def setup_task(project_id, dataset_id, pipeline_id):
+        client = Client(dask_scheduler)
+        # fire_and_forget(client.submit(DaskTasks.execute_task, int(project_id), int(dataset_id), int(pipeline_id)))
+        DaskTasks.execute_task(int(project_id), int(dataset_id), int(pipeline_id))
+
+    @staticmethod
+    def execute_task(project_id, dataset_id, pipeline_id):
+        # STAGE 1
+        update_status(
+            pipeline_id,
+            "Data and Model Setup: Retrieving dataset and pipeline", "1/{}".format(pre_processing_steps),
+            log="Pipeline: {}, Type: {}, Setup: 1/{}".format(pipeline_id, None, pre_processing_steps)
+        )
 
         dataset = Dataset.objects.get(id=int(dataset_id))
         pipeline = Pipeline.objects.get(id=int(pipeline_id))
-        # pipeline.save()
-        client = Client(dask_scheduler)
-        df = pd.read_csv(StringIO(bytes(dataset.data).decode())).drop("ID", axis=1)
-        fire_and_forget(client.submit(DaskTasks.execute_task, df, int(project_id), int(pipeline.id), str(pipeline.name), int(dataset_id)))
-        #DaskTasks.execute_task(df, int(amodel.id), str(amodel.name), int(dataset_id))
+
+        df = load_dataset(dataset_id, dataset)
+        pipeline_metadata = Metadata(parent=Pipeline.objects.get(id=pipeline_id)).get_metadata("PipelineMetadata")
+        project_metadata = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
+
+        target_label = "response" if "target" not in project_metadata.keys() else project_metadata["target"]
+        features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
+
+        # STAGE 2
+        update_status(
+            pipeline_id,
+            "Data and Model Setup: Loading data", "2/{}".format(pre_processing_steps),
+            log="Pipeline: {}, Type: {}, Setup: 2/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+        )
+
+        target = df[target_label]
+        if features_label:
+            features_list = json.loads(features_label.replace("\'", "\""))
+            features = df[features_list]
+        else:
+            features = df.drop(target_label, axis=1)
+
+        # STAGE 3
+        update_status(
+            pipeline_id,
+            "Data and Model Setup: Loading hyper-parameters", "3/{}".format(pre_processing_steps),
+            log="Pipeline: {}, Type: {}, Setup: 3/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+        )
+        hyper_parameters = None if "hyper_parameters" not in pipeline_metadata.keys() else pipeline_metadata["hyper_parameters"]
+        parameters = None if "parameters" not in project_metadata.keys() else project_metadata["parameters"]
+        # TODO: parameter will contain non-hyper-parameters for the pipeline, that are specified at the project level.
+
+        if pipeline.type == "enet":
+            enet = ENet(pipeline_id)
+            enet.set_params(**hyper_parameters)
+            enet.fit(features, target)
+            enet.save()
 
     @staticmethod
-    def execute_task(df, project_id, pipeline_id, pipeline_name, dataset_id):
-        logger.info("Starting Pipeline Pre-processing -------- Pipeline ID: {}; Pipeline Type: {}; step 1/{}".format(pipeline_id, pipeline_name, pre_processing_steps))
-        update_status(pipeline_id, "PP: Loading and validating data", "1/{}".format(pre_processing_steps))
-
-        dataset_m = Metadata(parent=Dataset.objects.get(id=dataset_id)).get_metadata("DatasetMetadata")
-        pipeline_m = Metadata(parent=Pipeline.objects.get(id=pipeline_id)).get_metadata("PipelineMetadata")
-        project_m = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
-        target = "Response" if "target" not in project_m.keys() else project_m["target"]
-        attributes = None if "features" not in project_m.keys() else project_m["features"]
-        y = df[target]
-        if attributes:
-            attributes_list = json.loads(attributes.replace("\'", "\""))
-            x = df[attributes_list]
+    def make_prediction(project_id, model_id, data: str = None):
+        project = Project.objects.get(id=int(project_id))
+        model = Model.objects.get(id=int(model_id))
+        dataset = Dataset.objects.get(id=int(project.dataset))
+        if data:
+            df = pd.read_csv(StringIO(data))
         else:
-            x = df.drop(target, axis=1)
-        logger.info("PP: Model ID: {}, loading hyper-parameters step 2/{}".format(pipeline_id, pre_processing_steps))
-        update_status(pipeline_id, "PP: Loading hyper-parameters", "2/{}".format(pre_processing_steps))
+            df = load_dataset(dataset.id, dataset)
+        project_metadata = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
 
-        logger.info("PP: Model ID: {}, setup complete step 3/{}".format(pipeline_id, pre_processing_steps))
-        update_status(pipeline_id, "PP: setup complete", "3/{}".format(pre_processing_steps))
+        target_label = "response" if "target" not in project_metadata.keys() else project_metadata["target"]
+        features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
 
-        if pipeline_name == "lra":
-            execute_lra(pipeline_id, pipeline_m, x, y)
-
-    @staticmethod
-    def make_prediction(project_id, amodel_id, data=None):
-        amodel = Model.objects.get(id=int(amodel_id))
-        dataset = Dataset.objects.get(id=int(amodel.dataset))
-        y_data = None
-
-        df = pd.read_csv(StringIO(bytes(dataset.data).decode()))
-        project_m = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
-        target = "Response" if "target" not in project_m.keys() else project_m["target"]
-        attributes = None if "features" not in project_m.keys() else project_m["features"]
-
-        y = df[target]
-        if attributes:
-            attributes_list = json.loads(attributes.replace("\'", "\""))
-            x = df[attributes_list]
+        target = df[target_label]
+        if features_label:
+            features_list = json.loads(features_label.replace("\'", "\""))
+            features = df[features_list]
         else:
-            x = df.drop(target, axis=1)
+            features = df.drop(target_label, axis=1)
 
-        t = LinearRegressionAutomatedVB()
-        t.set_data(x, y)
-        x_train = t.x_train
-        y_train = t.y_train
-        x_data = t.x_test
-        y_test = t.y_test.to_numpy().flatten()
+        m = model.model
+        score = m.score(features, target)
+        predict = m.predict(features)
 
-        if data is not None:
-            x_data = data
-        model = pickle.loads(amodel.model)
         response = {
-            "results": model.predict(x_data),
-            "train_score": model.score(x_train, y_train)
+            "results": predict,
+            "train_score": score
         }
-        if data is None:
-            response["residuals"] = y_test - response["results"]
-            response["test_score"] = model.score(x_data, y_test)
         return response
