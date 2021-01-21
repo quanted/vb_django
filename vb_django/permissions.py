@@ -22,9 +22,9 @@ class IsOwnerOfProject(permissions.BasePermission):
         return project.owner == request.user
 
 
-class IsOwnerOfExperiment(permissions.BasePermission):
+class IsOwnerOfPipeline(permissions.BasePermission):
     """
-    Checks if the user is the owner of the experiment's project
+    Checks if the user is the owner of the pipeline's project
     """
     def has_object_permission(self, request, view, obj):
         return obj.project.owner == request.user

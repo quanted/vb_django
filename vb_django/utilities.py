@@ -1,4 +1,4 @@
-from vb_django.models import Experiment
+from vb_django.models import Pipeline
 from vb_django.app.metadata import Metadata
 import json
 import logging
@@ -10,7 +10,7 @@ logger.setLevel(logging.INFO)
 def update_status(_id, status, stage, message=None, retry=5):
     if retry == 0:
         pass
-    meta = 'ExperimentMetadata'
+    meta = 'PipelineMetadata'
     try:
         amodel = Experiment.objects.get(id=int(_id))
         m = Metadata(parent=amodel, metadata=json.dumps({"status": status, "stage": stage, "message": message}))

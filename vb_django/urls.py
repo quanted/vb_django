@@ -22,7 +22,7 @@ from .landing import landing, asset_redirect
 from vb_django.views.user_views import UserView, UserLoginView, UserResetView
 from vb_django.views.locations_views import LocationView
 from vb_django.views.project_views import ProjectView
-from vb_django.views.experiment_views import ExperimentView
+from vb_django.views.pipeline_views import PipelineView
 from vb_django.views.dataset_views import DatasetView
 from vb_django.views.utilities_views import pipeline_details
 
@@ -32,8 +32,8 @@ router = routers.SimpleRouter()
 router.register('location', LocationView, basename='location')
 # --------- Project API endpoints ---------- #
 router.register('project', ProjectView, basename='project')
-# ------ Experiment API endpoints ------ #
-router.register('experiment', ExperimentView, basename='experiment')
+# ------ Pipeline API endpoints ------ #
+router.register('pipeline', PipelineView, basename='pipeline')
 # --------- Dataset API endpoints ---------- #
 router.register('dataset', DatasetView, basename='dataset')
 

@@ -1,8 +1,9 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, Experiment, Location, \
-    LocationMetadata, ExperimentMetadata, Model, ModelMetadata, AccessControlList, Pipeline, PipelineParameters
+from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, Pipeline, Location, \
+    LocationMetadata, PipelineMetadata, Model, ModelMetadata, AccessControlList, PipelineInstance, \
+    PipelineInstanceParameters, PipelineInstanceMetadata
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -80,7 +81,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
-            "id", "owner", "location", "name", "description"
+            "id", "owner", "dataset", "location", "name", "description"
         ]
 
 
@@ -128,34 +129,34 @@ class DatasetMetadataSerializer(serializers.ModelSerializer):
         ]
 
 
-class ExperimentSerializer(serializers.ModelSerializer):
+class PipelineSerializer(serializers.ModelSerializer):
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
 
     def create(self, validated_data):
-        experiment = Experiment(**validated_data)
-        experiment.save()
-        return experiment
+        pipeline = Pipeline(**validated_data)
+        pipeline.save()
+        return pipeline
 
     def update(self, instance, validated_data):
-        experiment = Experiment(**validated_data)
+        pipeline = Pipeline(**validated_data)
         try:
-            models = Model.objects.get(experiment=experiment)
+            models = Model.objects.get(pipeline=pipeline)
         except Model.DoesNotExist:
-            experiment.id = instance.id
-        experiment.project = instance.project
-        experiment.save()
-        return experiment
+            pipeline.id = instance.id
+        pipeline.project = instance.project
+        pipeline.save()
+        return pipeline
 
     class Meta:
-        model = Experiment
+        model = Pipeline
         fields = [
             "id", "project", "name", "type", "description"
         ]
 
 
-class ExperimentMetadataSerializer(serializers.ModelSerializer):
+class PipelineMetadataSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ExperimentMetadata
+        model = PipelineMetadata
         fields = [
             "id", "parent", "name", "value"
         ]
@@ -191,7 +192,7 @@ class ModelMetadataSerializer(serializers.ModelSerializer):
         ]
 
 
-class PipelineSerializer(serializers.ModelSerializer):
+class PipelineInstanceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         pipeline = Pipeline(**validated_data)
         pipeline.save()
@@ -211,16 +212,16 @@ class PipelineSerializer(serializers.ModelSerializer):
         ]
 
 
-class PipelineParameterSerializer(serializers.ModelSerializer):
+class PipelineInstanceParameterSerializer(serializers.ModelSerializer):
     pipeline = serializers.PrimaryKeyRelatedField(read_only=True)
 
     def create(self, validated_data):
-        pipelinep = PipelineParameters(**validated_data)
+        pipelinep = PipelineInstanceParameters(**validated_data)
         pipelinep.save()
         return pipelinep
 
     def update(self, instance, validated_data):
-        pipelinep = PipelineParameters(**validated_data)
+        pipelinep = PipelineInstanceParameters(**validated_data)
         if instance.model is None:
             pipelinep.id = instance.id
         pipelinep.save()
@@ -233,7 +234,7 @@ class PipelineParameterSerializer(serializers.ModelSerializer):
         ]
 
 
-class PipelineMetadataSerializer(serializers.ModelSerializer):
+class PipelineInstanceMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelMetadata
         fields = [

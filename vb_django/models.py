@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 class Project(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     location = models.IntegerField(null=True)
+    dataset = models.IntegerField(null=True)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
 
@@ -41,21 +42,21 @@ class LocationMetadata(models.Model):
     value = models.CharField(max_length=512)
 
 
-class Experiment(models.Model):
+class Pipeline(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     type = models.CharField(max_length=16)
     description = models.CharField(max_length=512)
 
 
-class ExperimentMetadata(models.Model):
-    parent = models.ForeignKey(Experiment, on_delete=models.CASCADE)
+class PipelineMetadata(models.Model):
+    parent = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
 
 class Model(models.Model):
-    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE)
+    experiment = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
     model = models.BinaryField()
@@ -67,23 +68,23 @@ class ModelMetadata(models.Model):
     value = models.CharField(max_length=512)
 
 
-class Pipeline(models.Model):
+class PipelineInstance(models.Model):
     id = models.CharField(max_length=16, primary_key=True)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
     active = models.BooleanField()
 
 
-class PipelineParameters(models.Model):
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+class PipelineInstanceParameters(models.Model):
+    pipeline = models.ForeignKey(PipelineInstance, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     vtype = models.CharField(max_length=64)
     value = models.CharField(max_length=128)
     options = models.CharField(max_length=512)
 
 
-class PipelineMetadata(models.Model):
-    parent = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+class PipelineInstanceMetadata(models.Model):
+    parent = models.ForeignKey(PipelineInstance, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     value = models.CharField(max_length=512)
 
