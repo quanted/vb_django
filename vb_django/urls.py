@@ -25,6 +25,7 @@ from vb_django.views.project_views import ProjectView
 from vb_django.views.pipeline_views import PipelineView
 from vb_django.views.dataset_views import DatasetView
 from vb_django.views.utilities_views import pipeline_details
+from vb_django.db_setup import load_pipelines
 
 
 router = routers.SimpleRouter()
@@ -67,6 +68,7 @@ urlpatterns = [
     path('api/', include(router.urls)),
 
     path('info/pipelines/', pipeline_details),
-
 ]
+
+load_pipelines()
 

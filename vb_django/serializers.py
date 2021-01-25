@@ -209,7 +209,7 @@ class PipelineInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Model
         fields = [
-            "id", "name", "active", "description"
+            "id", "name", "ptype", "active", "description"
         ]
 
 

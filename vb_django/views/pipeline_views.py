@@ -3,10 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from vb_django.models import Pipeline, Project
+from vb_django.models import Pipeline, Project, Dataset, Model
 from vb_django.app.metadata import Metadata
 from vb_django.serializers import PipelineSerializer
-from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject
+from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject, IsOwnerOfDataset, IsOwnerOfModel
+from vb_django.task_controller import DaskTasks
 
 
 class PipelineView(viewsets.ViewSet):
@@ -113,3 +114,147 @@ class PipelineView(viewsets.ViewSet):
             else:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
         return Response("No pipeline 'id' in request.", status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], name="Execute a pipeline")
+    def execute(self, request):
+        input_data = request.data.dict()
+        required_parameters = ["project_id", "dataset_id", "pipeline_id"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                pipeline = Pipeline.objects.get(id=int(input_data["pipeline_id"]))
+                if not IsOwnerOfPipeline().has_object_permission(request, self, pipeline):
+                    permissions.append("Unauthorized to access pipeline")
+            except Pipeline.DoesNotExist:
+                pipeline = None
+            try:
+                dataset = Dataset.objects.get(id=int(input_data["dataset_id"]))
+                if not IsOwnerOfDataset().has_object_permission(request, self, dataset):
+                    permissions.append("Unauthorized to access dataset")
+            except Dataset.DoesNotExist:
+                dataset = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if project is None or dataset is None or pipeline is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if dataset is None:
+                    message.append("No dataset found for id: {}".format(input_data["dataset_id"]))
+                if pipeline is None:
+                    message.append("No pipeline found for id: {}".format(input_data["pipeline_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            try:
+                DaskTasks.setup_task(project_id=project.id, dataset_id=dataset.id, pipeline_id=pipeline.id)
+                response = "Successfully executed pipeline"
+            except Exception as ex:
+                response = "Error occured attempting to execute pipeline. Message: {}".format(ex)
+            return Response(response, status=status.HTTP_200_OK)
+
+        else:
+            return Response(
+                "Missing required parameters in POST request. Required parameters: {}".format(", ".join(required_parameters)),
+                status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=["POST"], name="Get the status of an executed pipeline.")
+    def status(self, request):
+        input_data = request.data.dict()
+        required_parameters = ["project_id", "pipeline_id"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                pipeline = Pipeline.objects.get(id=int(input_data["pipeline_id"]))
+                if not IsOwnerOfPipeline().has_object_permission(request, self, pipeline):
+                    permissions.append("Unauthorized to access pipeline")
+            except Pipeline.DoesNotExist:
+                pipeline = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if pipeline is None or project is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if pipeline is None:
+                    message.append("No pipeline found for id: {}".format(input_data["pipeline_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            response = {}
+            meta = Metadata(parent=pipeline)
+            metadata = meta.get_metadata("PipelineMetadata", ['status', 'stage', 'message'])
+            response["metadata"] = metadata
+            completed = False
+            if "stage" in metadata.keys():
+                i = metadata["stage"].split("/")
+                if int(i[0]) == int(i[1]):
+                    completed = True
+                if completed:
+                    #TODO: Add additional pipeline completion results
+                    models = Model.objects.filter(pipeline=pipeline)
+                    model_details = []
+                    for m in models:
+                        model_details.append({
+                            "id": m.id,
+                            "name": m.name,
+                            "description": m.description
+                        })
+                    response["models"] = model_details
+                response["project_id"] = project.id
+                response["pipeline_id"] = pipeline.id
+            return Response(response, status=status.HTTP_200_OK)
+        data = "Missing required parameters: {}".format(", ".join(required_parameters))
+        response_status = status.HTTP_200_OK
+        return Response(data, status=response_status)
+
+    @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
+    def predict(self, request):
+        input_data = request.data.dict()
+        required_parameters = ["project_id", "model_id"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                model = Model.objects.get(id=int(input_data["model_id"]))
+                if not IsOwnerOfModel().has_object_permission(request, self, model):
+                    permissions.append("Unauthorized to access pipeline")
+            except Model.DoesNotExist:
+                model = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if model is None or project is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if model is None:
+                    message.append("No model found for id: {}".format(input_data["model_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            response = {}
+            if "data" in input_data.keys():
+                data = str(input_data["data"])
+            else:
+                data = None
+            results = DaskTasks.make_prediction(project.id, model.id, data)
+            response["project_id"] = project.id
+            response["pipeline_id"] = model.pipeline.id
+            response["model_id"] = model.id
+            response["results"] = results
+            return Response(response, status=status.HTTP_200_OK)
+        data = "Missing required parameters: {}".format(", ".join(required_parameters))
+        response_status = status.HTTP_200_OK
+        return Response(data, status=response_status)

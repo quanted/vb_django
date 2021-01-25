@@ -86,7 +86,7 @@ class DatasetView(viewsets.ViewSet):
                 response = "Response"
                 if meta:
                     dataset["metadata"] = meta
-                    response = meta["response"]
+                    response = meta["target"]
                 data = load_dataset(d.id)
                 if response not in data:
                     response = data.columns.tolist()[0]

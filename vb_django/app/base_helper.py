@@ -1,4 +1,4 @@
-from vb_django.utilities import update_status, save_model
+from vb_django.utilities import update_status, save_model, update_pipeline_metadata
 import datetime
 import warnings
 
@@ -14,10 +14,9 @@ class BaseHelper:
             "1/5",
             "Pipeline: {}, Initializing pipeline".format(self._pipeline_id)
         )
-        pass
 
-    def get_estimator(self):
-        return self.est_
+    # def get_estimator(self):
+    #     return self.est_
 
     def set_params(self, hyper_parameters):
         update_status(
@@ -27,6 +26,7 @@ class BaseHelper:
             "Pipeline: {}, Setting hyper-parameters".format(self._pipeline_id)
         )
         self.est_.set_params(hyper_parameters)
+        return self
 
     def fit(self, X, y):
         time0 = datetime.datetime.now()
@@ -40,7 +40,7 @@ class BaseHelper:
         self.est_ = self.get_estimator()
         self.est_.fit(X, y)
         runtime = datetime.datetime.now() - time0
-        # TODO: Update PipelineInstanceMetadata for +1 totalRuns, avgRuntime, avgRuntime/n
+        update_pipeline_metadata(type(self.est_), runtime, self.n_)
         update_status(
             self._pipeline_id,
             "Completed fitting pipeline estimator",

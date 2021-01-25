@@ -26,7 +26,7 @@ class Metadata:
         return meta
 
     def set_metadata(self, metadata_type):
-        self.delete_metadata(metadata_type)
+        # self.delete_metadata(metadata_type)
         metadata_model = apps.get_model("vb_django", metadata_type)
         for k, v in self.metadata.items():
             if type(v) == object:

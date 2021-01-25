@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from vb_django.models import Project, Model
+from vb_django.models import Project, Model, Dataset
 
 
 class IsOwner(permissions.BasePermission):
@@ -19,7 +19,19 @@ class IsOwnerOfProject(permissions.BasePermission):
             project = Project.objects.filter(id=obj.id)
         except Project.DoesNotExist:
             return False
-        return project.owner == request.user
+        return project[0].owner == request.user
+
+
+class IsOwnerOfDataset(permissions.BasePermission):
+    """
+    Checks if the user is the owner of some specified dataset
+    """
+    def has_object_permission(self, request, view, obj):
+        try:
+            dataset = Dataset.objects.filter(id=obj.id)
+        except Project.DoesNotExist:
+            return False
+        return dataset[0].owner == request.user
 
 
 class IsOwnerOfPipeline(permissions.BasePermission):

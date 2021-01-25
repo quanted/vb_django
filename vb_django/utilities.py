@@ -1,4 +1,4 @@
-from vb_django.models import Pipeline, Dataset, Model
+from vb_django.models import Pipeline, Dataset, Model, PipelineInstance, PipelineInstanceMetadata
 from vb_django.app.metadata import Metadata
 import json
 import logging
@@ -80,3 +80,20 @@ def load_model(model_id, model=None):
     comp_model = zlib.decompress(model.data)
     r_model = pickle.loads(comp_model)
     return r_model
+
+
+def update_pipeline_metadata(pipeline, runtime, n):
+    for p in pipeline.metrics:
+        try:
+            pipelineMetata = PipelineInstanceMetadata.objects.get(pipeline=PipelineInstance.objects.get(ptype=pipeline.type), name=p)
+            value = pipelineMetata.value
+            if p == "total_runs":
+                value = str(int(pipelineMetata.value) + 1)
+            elif p == "avg_runtime":
+                value = str((float(pipelineMetata.value) + runtime)/2.0)
+            elif p == "avg_runtime/n":
+                value = str((float(pipelineMetata.value) + (runtime/float(n))/2.0))
+            pipelineMetata.value = value
+            pipelineMetata.save()
+        except PipelineInstanceMetadata.DoesNotExist:
+            continue

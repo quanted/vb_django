@@ -56,7 +56,7 @@ class PipelineMetadata(models.Model):
 
 
 class Model(models.Model):
-    experiment = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=512)
     model = models.BinaryField()
@@ -69,8 +69,9 @@ class ModelMetadata(models.Model):
 
 
 class PipelineInstance(models.Model):
-    id = models.CharField(max_length=16, primary_key=True)
+    # id = models.AutoField(max_length=16, primary_key=True)
     name = models.CharField(max_length=128)
+    ptype = models.CharField(max_length=32)
     description = models.CharField(max_length=512)
     active = models.BooleanField()
 
