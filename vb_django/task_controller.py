@@ -1,3 +1,4 @@
+import vb_django.dask_django
 from dask.distributed import Client, fire_and_forget
 from vb_django.models import Project, Dataset, Pipeline, Model
 from io import StringIO
@@ -46,9 +47,12 @@ class DaskTasks:
             "Data and Model Setup: Retrieving dataset and pipeline", "1/{}".format(pre_processing_steps),
             log="Pipeline: {}, Type: {}, Setup: 1/{}".format(pipeline_id, None, pre_processing_steps)
         )
-
+        project = Project.objects.get(id=int(project_id))
         dataset = Dataset.objects.get(id=int(dataset_id))
         pipeline = Pipeline.objects.get(id=int(pipeline_id))
+
+        project.dataset = int(dataset_id)
+        project.save()
 
         df = load_dataset(dataset_id, dataset)
         pipeline_metadata = Metadata(parent=Pipeline.objects.get(id=pipeline_id)).get_metadata("PipelineMetadata")
