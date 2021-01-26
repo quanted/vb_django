@@ -16,17 +16,17 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
     description = "placeholder description for the enet pipeline"
     hyper_parameters = {
         "impute_strategy": {
-            "type": "list",
+            "type": "str",
             "options": ['impute_knn5'],
             "value": "impute_knn5"
         },
         "gridpoints": {
             "type": "int",
-            "options": "1:5",
+            "options": "1:8",
             "value": 4
         },
         "cv_strategy": {
-            "type": "list",
+            "type": "str",
             "options": ['quantile'],
             "value": 'quantile'
         },

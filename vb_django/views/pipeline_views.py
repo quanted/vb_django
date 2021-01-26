@@ -163,9 +163,9 @@ class PipelineView(viewsets.ViewSet):
                 status.HTTP_400_BAD_REQUEST
             )
 
-    @action(detail=False, methods=["POST"], name="Get the status of an executed pipeline.")
+    @action(detail=False, methods=["GET"], name="Get the status of an executed pipeline.")
     def status(self, request):
-        input_data = request.data.dict()
+        input_data = self.request.query_params
         required_parameters = ["project_id", "pipeline_id"]
         if set(required_parameters).issubset(input_data.keys()):
             permissions = []

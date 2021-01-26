@@ -4,7 +4,7 @@ from io import StringIO
 from vb_django.app.metadata import Metadata
 from vb_django.utilities import update_status, load_dataset, load_model
 from vb_django.app.elasticnet import ENet
-from sklearn.metrics import mean_squared_error
+from vb_django.app.base_helper import BaseHelper
 from dask import delayed
 import pandas as pd
 import os
@@ -30,9 +30,13 @@ class DaskTasks:
 
     @staticmethod
     def setup_task(project_id, dataset_id, pipeline_id):
-        #client = Client(dask_scheduler)
-        # fire_and_forget(client.submit(DaskTasks.execute_task, int(project_id), int(dataset_id), int(pipeline_id)))
-        DaskTasks.execute_task(int(project_id), int(dataset_id), int(pipeline_id))
+        docker = bool(os.getenv("IN_DOCKER", False))
+
+        if docker:
+            client = Client(dask_scheduler)
+            fire_and_forget(client.submit(DaskTasks.execute_task, int(project_id), int(dataset_id), int(pipeline_id)))
+        else:
+            DaskTasks.execute_task(int(project_id), int(dataset_id), int(pipeline_id))
 
     @staticmethod
     def execute_task(project_id, dataset_id, pipeline_id):
@@ -108,9 +112,8 @@ class DaskTasks:
             features = df.drop(target_label, axis=1)
 
         m = load_model(model.id, model.model)
-        # score = m.score(features, target)
         predict = m.predict(features)
-        score = mean_squared_error(target, predict)
+        score = BaseHelper.score(target, predict)
 
         response = {
             "results": predict,

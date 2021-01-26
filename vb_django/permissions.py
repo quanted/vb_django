@@ -47,7 +47,7 @@ class IsOwnerOfModel(permissions.BasePermission):
     Checks if the user is the owner of the project for the model of this experiment
     """
     def has_object_permission(self, request, view, obj):
-        return obj.model.experiement.project.owner == request.user
+        return obj.pipeline.project.owner == request.user
 
 
 class HasModelIntegrity(permissions.BasePermission):

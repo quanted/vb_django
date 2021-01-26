@@ -51,10 +51,10 @@ def load_dataset(dataset_id, dataset=None):
     return df
 
 
-def save_model(model: bytes, model_id=None, pipeline_id=None):
+def save_model(model, model_id=None, pipeline_id=None, replace=True):
     comp_model = zlib.compress(pickle.dumps(model))
     m = None
-    if not model_id:
+    if model_id:
         try:
             o_model = Model.objects.get(id=int(model_id))
         except Model.DoesNotExist:
@@ -65,19 +65,23 @@ def save_model(model: bytes, model_id=None, pipeline_id=None):
     if pipeline_id and not model_id:
         pipeline = Pipeline.objects.get(id=int(pipeline_id))
         existing_m = Model.objects.filter(pipeline=pipeline)
+        if replace:
+            for m in existing_m:
+                m.delete()
         l = 1 if existing_m is None else len(existing_m) + 1
         name = "{}-{}".format(pipeline.type, l)
-        m = Model(pipeline, name, "", comp_model)
+        m = Model(pipeline=pipeline, name=name, description="", model=comp_model)
+        m.save()
     return m
 
 
 def load_model(model_id, model=None):
     if not model:
         try:
-            model = Model.objects.get(id=int(model_id))
+            model = Model.objects.get(id=int(model_id)).model
         except Model.DoesNotExist:
             return None
-    comp_model = zlib.decompress(model.data)
+    comp_model = zlib.decompress(model)
     r_model = pickle.loads(comp_model)
     return r_model
 
@@ -85,14 +89,20 @@ def load_model(model_id, model=None):
 def update_pipeline_metadata(pipeline, runtime, n):
     for p in pipeline.metrics:
         try:
-            pipelineMetata = PipelineInstanceMetadata.objects.get(pipeline=PipelineInstance.objects.get(ptype=pipeline.type), name=p)
-            value = pipelineMetata.value
+            pipelineMetata = PipelineInstanceMetadata.objects.get(parent=PipelineInstance.objects.get(ptype=pipeline.ptype), name=p)
+            value = float(pipelineMetata.value)
             if p == "total_runs":
                 value = str(int(pipelineMetata.value) + 1)
             elif p == "avg_runtime":
-                value = str((float(pipelineMetata.value) + runtime)/2.0)
+                if value != 0.0:
+                    value = str((float(pipelineMetata.value) + runtime)/2.0)
+                else:
+                    value = runtime
             elif p == "avg_runtime/n":
-                value = str((float(pipelineMetata.value) + (runtime/float(n))/2.0))
+                if value != 0.0 and n != 0:
+                    value = str((float(pipelineMetata.value) + (runtime/float(n))/2.0))
+                else:
+                    value = (runtime / float(n))
             pipelineMetata.value = value
             pipelineMetata.save()
         except PipelineInstanceMetadata.DoesNotExist:
