@@ -110,12 +110,11 @@ def update_pipeline_metadata(pipeline, runtime, n):
 
 
 def load_request(request):
-    if request.POST:
-        data = request.POST.dict()
-    elif request.data:
-        data = request.data.dict()
-    elif request.body:
+    data = None
+    if request.body:
         data = json.loads(request.body.decode('utf-8'))
-    else:
-        data = None
+    if request.POST and data is None:
+        data = request.POST.dict()
+    if request.data and data is None:
+        data = request.data.dict()
     return data
