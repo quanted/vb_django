@@ -107,3 +107,15 @@ def update_pipeline_metadata(pipeline, runtime, n):
             pipelineMetata.save()
         except PipelineInstanceMetadata.DoesNotExist:
             continue
+
+
+def load_request(request):
+    if request.POST:
+        data = request.POST.dict()
+    elif request.data:
+        data = request.data.dict()
+    elif request.body:
+        data = json.loads(request.body.decode('utf-8'))
+    else:
+        data = None
+    return data

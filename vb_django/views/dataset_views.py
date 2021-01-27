@@ -9,7 +9,7 @@ from vb_django.app.metadata import Metadata
 from vb_django.app.statistics import DatasetStatistics
 from io import StringIO
 import pandas as pd
-from vb_django.utilities import load_dataset
+from vb_django.utilities import load_dataset, load_request
 
 
 class DatasetView(viewsets.ViewSet):
@@ -72,7 +72,7 @@ class DatasetView(viewsets.ViewSet):
         :param request: POST request.
         :return: New dataset
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -102,7 +102,7 @@ class DatasetView(viewsets.ViewSet):
         :param pk: dataset ID to be updated
         :return: 200/details of updated dataset, 400/bad request, or 401/unauthorized
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid() and pk is not None:
             try:

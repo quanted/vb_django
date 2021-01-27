@@ -6,6 +6,7 @@ from vb_django.models import Project
 from vb_django.serializers import ProjectSerializer
 from vb_django.permissions import IsOwner
 from vb_django.app.metadata import Metadata
+from vb_django.utilities import load_request
 
 
 class ProjectView(viewsets.ViewSet):
@@ -39,7 +40,7 @@ class ProjectView(viewsets.ViewSet):
         :param request: POST request
         :return: New project object
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -59,7 +60,7 @@ class ProjectView(viewsets.ViewSet):
         :param request: PUT request
         :return: The updated/200
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid() and pk is not None:
             try:

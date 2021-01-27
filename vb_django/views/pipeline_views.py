@@ -8,6 +8,7 @@ from vb_django.app.metadata import Metadata
 from vb_django.serializers import PipelineSerializer
 from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject, IsOwnerOfDataset, IsOwnerOfModel
 from vb_django.task_controller import DaskTasks
+from vb_django.utilities import load_request
 
 
 class PipelineView(viewsets.ViewSet):
@@ -44,7 +45,7 @@ class PipelineView(viewsets.ViewSet):
         :param request: POST request
         :return: New pipeline object
         """
-        pipeline_inputs = request.data.dict()
+        pipeline_inputs = load_request(request)
         serializer = self.serializer_class(data=pipeline_inputs, context={'request': request})
         try:
             project = Project.objects.get(id=int(pipeline_inputs["project"]))
@@ -66,7 +67,7 @@ class PipelineView(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None):
-        pipeline_inputs = request.data.dict()
+        pipeline_inputs = load_request(request)
         serializer = self.serializer_class(data=request.data.dict(), context={'request': request})
 
         try:
@@ -117,7 +118,7 @@ class PipelineView(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], name="Execute a pipeline")
     def execute(self, request):
-        input_data = request.data.dict()
+        input_data = load_request(request)
         required_parameters = ["project_id", "dataset_id", "pipeline_id"]
         if set(required_parameters).issubset(input_data.keys()):
             permissions = []
@@ -220,7 +221,7 @@ class PipelineView(viewsets.ViewSet):
 
     @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
     def predict(self, request):
-        input_data = request.data.dict()
+        input_data = load_request(request)
         required_parameters = ["project_id", "model_id"]
         if set(required_parameters).issubset(input_data.keys()):
             permissions = []

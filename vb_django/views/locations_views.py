@@ -6,6 +6,7 @@ from vb_django.models import Location, Project
 from vb_django.serializers import LocationSerializer
 from vb_django.permissions import IsOwnerOfProject
 from vb_django.app.metadata import Metadata
+from vb_django.utilities import load_request
 
 
 class LocationView(viewsets.ViewSet):
@@ -38,7 +39,7 @@ class LocationView(viewsets.ViewSet):
         :param request: POST request
         :return: New location object
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         # TODO: Add project existence and ownership check
         if serializer.is_valid():
@@ -61,7 +62,7 @@ class LocationView(viewsets.ViewSet):
         :param pk: Location ID
         :return:
         """
-        dataset_inputs = request.data.dict()
+        dataset_inputs = load_request(request)
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         if serializer.is_valid() and pk is not None:
             try:
