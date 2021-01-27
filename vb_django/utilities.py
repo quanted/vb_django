@@ -69,7 +69,7 @@ def save_model(model, model_id=None, pipeline_id=None, replace=True):
             for m in existing_m:
                 m.delete()
         l = 1 if existing_m is None else len(existing_m) + 1
-        name = "{}-{}".format(pipeline.type, l)
+        name = "{}-{}".format(pipeline.type, l+1)
         m = Model(pipeline=pipeline, name=name, description="", model=comp_model)
         m.save()
     return m

@@ -211,6 +211,7 @@ class PipelineView(viewsets.ViewSet):
                         })
                     response["models"] = model_details
                 response["project_id"] = project.id
+                response["dataset_id"] = project.dataset
                 response["pipeline_id"] = pipeline.id
             return Response(response, status=status.HTTP_200_OK)
         data = "Missing required parameters: {}".format(", ".join(required_parameters))
@@ -253,6 +254,7 @@ class PipelineView(viewsets.ViewSet):
             response["project_id"] = project.id
             response["pipeline_id"] = model.pipeline.id
             response["model_id"] = model.id
+            response["dataset_id"] = project.dataset
             response["results"] = results
             return Response(response, status=status.HTTP_200_OK)
         data = "Missing required parameters: {}".format(", ".join(required_parameters))
