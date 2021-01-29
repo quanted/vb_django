@@ -7,8 +7,8 @@ def pipeline_details(request):
     Returns the details for each of the implemented pipelines and their corresponding hyper-parameters
     """
     details = []
-    pipeline = {}
     for p in PipelineInstance.objects.all():
+        pipeline = {}
         if p.active == 0:
             continue
         pipeline["name"] = p.name

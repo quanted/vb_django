@@ -5,6 +5,7 @@ from io import StringIO
 from vb_django.app.metadata import Metadata
 from vb_django.utilities import update_status, load_dataset, load_model
 from vb_django.app.elasticnet import ENet
+from vb_django.app.gbr import GBR, HGBR
 from vb_django.app.base_helper import BaseHelper
 from dask import delayed
 import pandas as pd
@@ -22,8 +23,8 @@ pre_processing_steps = 3
 
 pipelines = {
     "enet": ENet,
-    # GradientBoosting
-    #
+    "gbr": GBR,
+    "hgbr": HGBR
 }
 
 
@@ -90,6 +91,16 @@ class DaskTasks:
             enet.set_params(hyper_parameters)
             enet.fit(features, target)
             enet.save()
+        elif pipeline.type == "gbr":
+            gbr = GBR(pipeline_id)
+            gbr.set_params(hyper_parameters)
+            gbr.fit(features, target)
+            gbr.save()
+        elif pipeline.type == "hgbr":
+            hgbr = HGBR(pipeline_id)
+            hgbr.set_params(hyper_parameters)
+            hgbr.fit(features, target)
+            hgbr.save()
 
     @staticmethod
     def make_prediction(project_id, model_id, data: str = None):
@@ -120,7 +131,7 @@ class DaskTasks:
         score = BaseHelper.score(target, predict)
 
         response = {
-            "results": predict,
+            "predict": predict,
             "train_score": score
         }
         return response
