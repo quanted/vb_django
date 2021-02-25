@@ -1,14 +1,14 @@
-import numpy as np
+# import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import ElasticNetCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+# from sklearn.linear_model import ElasticNetCV
+# from sklearn.preprocessing import StandardScaler
+# from sklearn.model_selection import RepeatedKFold, GridSearchCV
 from sklearn.experimental import enable_hist_gradient_boosting
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor
 from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
-from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
+# from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.app.base_helper import BaseHelper
 
 
@@ -27,22 +27,19 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id):
+    def __init__(self, pipeline_id=None):
+        self.pid = pipeline_id
         self.bestT = False
         self.cat_idx = None
         self.float_idx = None
-        self.impute_strategy = None
-        super().__init__(pipeline_id)
+        self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
+        super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
         # Validation of user specified impute_strategy
         if "impute_strategy" in hyper_parameters.keys():
             if hyper_parameters["impute_strategy"] in self.hyper_parameters["impute_strategy"]["options"]:
                 self.impute_strategy = hyper_parameters["impute_strategy"]
-            else:
-                self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
-        else:
-            self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
 
     def get_estimator(self):
         steps = [
@@ -63,9 +60,10 @@ class HGBR(BaseEstimator, TransformerMixin, BaseHelper):
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
     def __init__(self, pipeline_id):
+        self.pid = pipeline_id
         self.cat_idx = None
         self.float_idx = None
-        super().__init__(pipeline_id)
+        super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
         self.cat_idx = None

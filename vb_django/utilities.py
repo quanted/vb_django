@@ -6,6 +6,7 @@ import zlib
 import pandas as pd
 from io import StringIO
 import pickle
+import sys
 
 
 logger = logging.getLogger("vb_dask")
@@ -13,8 +14,10 @@ logger.setLevel(logging.INFO)
 
 
 def update_status(_id, status, stage, message=None, retry=5, log=None):
+    if _id == -1:
+        return
     if retry == 0:
-        pass
+        return
     meta = 'PipelineMetadata'
     try:
         amodel = Pipeline.objects.get(id=int(_id))
@@ -23,7 +26,7 @@ def update_status(_id, status, stage, message=None, retry=5, log=None):
         if log:
             logger.info(log)
     except Exception as ex:
-        logger.warning("Error attempting to save metadata update: {}".format(ex))
+        logger.warning("Error attempting to save status update: {}".format(ex))
         update_status(_id, status, stage, None, retry - 1)
 
 
@@ -37,6 +40,7 @@ def save_dataset(data: str, dataset_id=None):
             return None
         dataset.data = ce_str
         dataset.save()
+        logger.info("Dataset ID: {} saved; raw {} bytes; compressed {} bytes".format(dataset_id, sys.getsizeof(e_str), sys.getsizeof(ce_str)))
     return ce_str
 
 
@@ -52,7 +56,12 @@ def load_dataset(dataset_id, dataset=None):
 
 
 def save_model(model, model_id=None, pipeline_id=None, replace=True):
-    comp_model = zlib.compress(pickle.dumps(model))
+    try:
+        raw_model = pickle.dumps(model)
+    except Exception as e:
+        logger.warning("Pipeline ID: {}, Model ID: {}, error attempting to pickle model: {}".format(pipeline_id, model_id, e))
+        return None
+    comp_model = zlib.compress(raw_model)
     m = None
     if model_id:
         try:
@@ -72,6 +81,8 @@ def save_model(model, model_id=None, pipeline_id=None, replace=True):
         name = "{}-{}".format(pipeline.type, l+1)
         m = Model(pipeline=pipeline, name=name, description="", model=comp_model)
         m.save()
+    if m:
+        logger.info("Model ID: {} saved; raw {} bytes; compressed {} bytes".format(model_id, sys.getsizeof(raw_model), sys.getsizeof(comp_model)))
     return m
 
 

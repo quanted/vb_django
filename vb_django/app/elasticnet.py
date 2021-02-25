@@ -38,16 +38,17 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id):
-        self.gridpoints = None
-        self.cv_strategy = None
-        self.groupcount = None
+    def __init__(self, pipeline_id=None):
+        self.pid = pipeline_id
+        self.gridpoints = self.hyper_parameters["gridpoints"]["value"]
+        self.cv_strategy = self.hyper_parameters["cv_strategy"]["value"]
+        self.groupcount = self.hyper_parameters["groupcount"]["value"]
         self.float_idx = None
         self.cat_idx = None
         self.bestT = False
-        self.impute_strategy = None
+        self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
         self.flags = None
-        super().__init__(pipeline_id)
+        super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
         # TODO: Update output to display the hyper-parameter values used.
@@ -55,36 +56,20 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
         if "impute_strategy" in hyper_parameters.keys():
             if hyper_parameters["impute_strategy"] in self.hyper_parameters["impute_strategy"]["options"]:
                 self.impute_strategy = hyper_parameters["impute_strategy"]
-            else:
-                self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
-        else:
-            self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
         # Validation of user specified gridpoints
         if "gridpoints" in hyper_parameters.keys():
             gp_range = self.hyper_parameters["gridpoints"]["options"].split(":")
             if int(gp_range[0]) <= int(hyper_parameters["gridpoints"]) <= int(gp_range[1]):
                 self.gridpoints = int(hyper_parameters["gridpoints"])
-            else:
-                self.gridpoints = self.hyper_parameters["gridpoints"]["value"]
-        else:
-            self.gridpoints = self.hyper_parameters["gridpoints"]["value"]
         # Validation of user specified cv_strategy
         if "cv_strategy" in hyper_parameters.keys():
             if hyper_parameters["cv_strategy"] in self.hyper_parameters["cv_strategy"]["options"]:
                 self.cv_strategy = hyper_parameters["cv_strategy"]
-            else:
-                self.cv_strategy = self.hyper_parameters["cv_strategy"]["value"]
-        else:
-            self.cv_strategy = self.hyper_parameters["cv_strategy"]["value"]
         # Validation of user specified groupcount
         if "groupcount" in hyper_parameters.keys():
             gp_range = self.hyper_parameters["groupcount"]["options"].split(":")
             if int(gp_range[0]) <= int(hyper_parameters["groupcount"]) <= int(gp_range[1]):
                 self.groupcount = int(hyper_parameters["groupcount"])
-            else:
-                self.groupcount = self.hyper_parameters["groupcount"]["value"]
-        else:
-            self.groupcount = self.hyper_parameters["groupcount"]["value"]
 
     def get_estimator(self):
         if self.cv_strategy:

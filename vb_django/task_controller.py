@@ -6,6 +6,7 @@ from vb_django.app.metadata import Metadata
 from vb_django.utilities import update_status, load_dataset, load_model
 from vb_django.app.elasticnet import ENet
 from vb_django.app.gbr import GBR, HGBR
+from vb_django.app.cross_validation import CrossValidatePipeline
 from vb_django.app.base_helper import BaseHelper
 from dask import delayed
 import pandas as pd
@@ -24,7 +25,8 @@ pre_processing_steps = 3
 pipelines = {
     "enet": ENet,
     "gbr": GBR,
-    "hgbr": HGBR
+    "hgbr": HGBR,
+    "cvpipe": CrossValidatePipeline
 }
 
 
@@ -86,21 +88,69 @@ class DaskTasks:
         parameters = None if "parameters" not in project_metadata.keys() else project_metadata["parameters"]
         # TODO: parameter will contain non-hyper-parameters for the pipeline, that are specified at the project level.
 
-        if pipeline.type == "enet":
-            enet = ENet(pipeline_id)
-            enet.set_params(hyper_parameters)
-            enet.fit(features, target)
-            enet.save()
-        elif pipeline.type == "gbr":
-            gbr = GBR(pipeline_id)
-            gbr.set_params(hyper_parameters)
-            gbr.fit(features, target)
-            gbr.save()
-        elif pipeline.type == "hgbr":
-            hgbr = HGBR(pipeline_id)
-            hgbr.set_params(hyper_parameters)
-            hgbr.fit(features, target)
-            hgbr.save()
+        try:
+            if pipeline.type == "enet":
+                enet = ENet(pipeline_id)
+                enet.set_params(hyper_parameters)
+                enet.fit(features, target)
+                enet.save()
+            elif pipeline.type == "gbr":
+                gbr = GBR(pipeline_id)
+                gbr.set_params(hyper_parameters)
+                gbr.fit(features, target)
+                gbr.save()
+            elif pipeline.type == "hgbr":
+                hgbr = HGBR(pipeline_id)
+                hgbr.set_params(hyper_parameters)
+                hgbr.fit(features, target)
+                hgbr.save()
+            elif pipeline.type == "cvpipe":
+                if "estimators" in pipeline_metadata.keys():
+                    estimators = json.loads(pipeline_metadata["estimators"].replace("\'", "\""))
+                else:
+                    update_status(pipeline_id, "Error: Pipeline cvpipe requires an estimator.",
+                                  "-1/{}".format(pre_processing_steps),
+                                  log="Pipeline: {}, Type: {}, Setup: -1/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+                                  )
+                    return
+                if len(estimators) == 0:
+                    update_status(pipeline_id, "Error: Pipeline cvpipe requires an estimator.",
+                                  "-1/{}".format(pre_processing_steps),
+                                  log="Pipeline: {}, Type: {}, Setup: -1/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+                                  )
+                    return
+                estimator_dict = {}
+                for e in estimators:
+                    if e["type"] != pipeline.type:
+                        estimator = DaskTasks.get_estimator(e["type"])
+                        if estimator:
+                            est = estimator(pipeline_id)
+                            est.set_params(e["hyper_parameters"])
+                            estimator_dict[e["type"]] = est
+                cvpipe = CrossValidatePipeline(pipeline_id)
+                cvpipe.set_params(hyper_parameters)
+                cvpipe.set_data(features, target)
+                cvpipe.set_estimators(estimator_dict)
+                fitted = cvpipe.fit()
+                if not fitted:
+                    update_status(pipeline_id, "Error: Pipeline missing required estimator, model or data.",
+                                  "-5/7",
+                                  log="Pipeline: {}, Type: {}, Setup: -5/7".format(pipeline_id, pipeline.name)
+                                  )
+                    return
+                cvpipe.run_cross_validate()
+                cvpipe.save()
+        except Exception as e:
+            update_status(pipeline_id, "Error: Unknown error executing pipeline",
+                          "-0/7",
+                          log="Pipeline: {}, Type: {}, Error: {}".format(pipeline_id, pipeline.name, e)
+                          )
+
+    @staticmethod
+    def get_estimator(etype):
+        if etype in pipelines.keys():
+            return pipelines[etype]
+        return None
 
     @staticmethod
     def make_prediction(project_id, model_id, data: str = None):
@@ -128,7 +178,11 @@ class DaskTasks:
 
         m = load_model(model.id, model.model)
         predict = m.predict(features)
-        score = BaseHelper.score(target, predict)
+        if type(predict) == tuple:
+            score = predict[1]
+            predict = predict[0]
+        else:
+            score = BaseHelper.score(target, predict)
 
         response = {
             "predict": predict,

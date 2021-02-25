@@ -8,12 +8,12 @@ warnings.simplefilter('ignore')
 
 class BaseHelper:
     def __init__(self, pipeline_id):
-        self._pipeline_id = pipeline_id
+        self._pipeline_id = pipeline_id if pipeline_id is not None else -1
         update_status(
             self._pipeline_id,
             "Initializing pipeline",
             "1/5",
-            "Pipeline: {}, Initializing pipeline".format(self._pipeline_id)
+            log="Pipeline: {}, Initializing pipeline. Step: 1/5".format(self._pipeline_id)
         )
 
     # def get_estimator(self):
@@ -24,7 +24,7 @@ class BaseHelper:
             self._pipeline_id,
             "Setting hyper-parameters",
             "2/5",
-            "Pipeline: {}, Setting hyper-parameters".format(self._pipeline_id)
+            log="Pipeline: {}, Setting hyper-parameters. Step: 2/5".format(self._pipeline_id)
         )
         self.est_.set_params(hyper_parameters)
         return self
@@ -35,7 +35,7 @@ class BaseHelper:
             self._pipeline_id,
             "Fitting pipeline estimator",
             "3/5",
-            "Pipeline: {}, Fitting pipeline estimator".format(self._pipeline_id)
+            log="Pipeline: {}, Fitting pipeline estimator. Step: 3/5".format(self._pipeline_id)
         )
         self.n_, self.k_ = X.shape
         self.est_ = self.get_estimator()
@@ -46,7 +46,7 @@ class BaseHelper:
             self._pipeline_id,
             "Completed fitting pipeline estimator",
             "4/5",
-            "Pipeline: {}, Completed fitting pipeline estimator".format(self._pipeline_id)
+            log="Pipeline: {}, Completed fitting pipeline estimator. Step: 4/5".format(self._pipeline_id)
         )
         return self
 
@@ -127,6 +127,9 @@ class BaseHelper:
         }
         return {"metrics": metrics, "metadata": metadata}
 
+    def scoreXY(self, X, y):
+        return self.est_.score(X, y)
+
     def predict(self, X):
         return self.est_.predict(X)
 
@@ -137,7 +140,7 @@ class BaseHelper:
                 self._pipeline_id,
                 "Completed and model saved",
                 "5/5",
-                "Pipeline: {}, Model: {}, Completed and model saved".format(self._pipeline_id, m.id)
+                log="Pipeline: {}, Model: {}, Completed and model saved. Step: 5/5".format(self._pipeline_id, m.id)
             )
             return True
         else:
@@ -145,6 +148,7 @@ class BaseHelper:
                 self._pipeline_id,
                 "Completed pipeline, error saving model",
                 "-5/5",
-                "Pipeline: {}, Completed pipeline, error saving model".format(self._pipeline_id)
+                log="Pipeline: {}, Completed pipeline, error saving model. Step: -5/5".format(self._pipeline_id)
             )
             return False
+
