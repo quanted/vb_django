@@ -54,10 +54,10 @@ class DatasetView(viewsets.ViewSet):
             response = "Response"
             if meta:
                 response_data["metadata"] = meta
-                response = meta["response"]
+                response = meta["target"]
             response_data["data"] = load_dataset(pk)
-            if response not in response_data["data"]:
-                response = response_data["data"].columns.tolist()[0]
+            # if response not in response_data["data"]:
+            #     response = response_data["data"].columns.tolist()[0]
             response_data["statistics"] = DatasetStatistics(response_data["data"]).calculate_statistics(response)
             return Response(response_data, status=status.HTTP_200_OK)
         else:
