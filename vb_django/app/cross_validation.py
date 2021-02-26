@@ -88,13 +88,15 @@ class CrossValidatePipeline:
         self.cat_idx, self.cat_vars = None, None
         self.float_idx = None
 
-    def set_params(self, parameters: dict):
+    def set_params(self, parameters: dict = None):
         update_status(
             self.pid,
             "Settings and validating hyper-parameters",
             "2/7",
             log="Pipeline: {}, Setting hyper-parameters. Step: 2/7".format(self.pid)
         )
+        if parameters is None:
+            return
         for k, v in parameters.items():
             if k == "test_share":
                 r = self.hyper_parameters["test_share"]["options"].split(":")

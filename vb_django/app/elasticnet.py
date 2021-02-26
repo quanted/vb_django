@@ -51,6 +51,8 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
         super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
+        if hyper_parameters is None:
+            return
         # TODO: Update output to display the hyper-parameter values used.
         # Validation of user specified impute_strategy
         if "impute_strategy" in hyper_parameters.keys():

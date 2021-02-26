@@ -36,6 +36,8 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
         super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
+        if hyper_parameters is None:
+            return
         # Validation of user specified impute_strategy
         if "impute_strategy" in hyper_parameters.keys():
             if hyper_parameters["impute_strategy"] in self.hyper_parameters["impute_strategy"]["options"]:
@@ -66,6 +68,8 @@ class HGBR(BaseEstimator, TransformerMixin, BaseHelper):
         super().__init__(self.pid)
 
     def set_params(self, hyper_parameters):
+        if hyper_parameters is None:
+            return
         self.cat_idx = None
         self.float_idx = None
 
