@@ -84,8 +84,14 @@ class DaskTasks:
             "Data and Model Setup: Loading hyper-parameters", "3/{}".format(pre_processing_steps),
             log="Pipeline: {}, Type: {}, Setup: 3/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
         )
-        hyper_parameters = None if "hyper_parameters" not in pipeline_metadata.keys() else json.loads(pipeline_metadata["hyper_parameters"].replace("'", "\""))
-        parameters = None if "parameters" not in project_metadata.keys() else project_metadata["parameters"]
+        if pipeline_metadata:
+            hyper_parameters = None if "hyper_parameters" not in pipeline_metadata.keys() else json.loads(pipeline_metadata["hyper_parameters"].replace("'", "\""))
+        else:
+            hyper_parameters = {}
+        if project_metadata:
+            parameters = None if "parameters" not in project_metadata.keys() else project_metadata["parameters"]
+        else:
+            parameters = {}
         # TODO: parameter will contain non-hyper-parameters for the pipeline, that are specified at the project level.
 
         try:

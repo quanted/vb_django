@@ -65,6 +65,7 @@ class CrossValidatePipeline:
             "1/7",
             log="Pipeline: {}, Initializing pipeline. Step: 1/7".format(pipeline_id)
         )
+        self.time0 = time.time()
         self.pid = pipeline_id
         self.test_share = self.hyper_parameters["test_share"]["value"]
         self.cv_folds = int(self.hyper_parameters["cv_folds"]["value"])
@@ -208,6 +209,9 @@ class CrossValidatePipeline:
                 random_state=self.seed, groupcount=self.cv_groupcount, strategy=self.cv_strategy)
 
     def save(self):
+        n, k = self.x.shape
+        runtime = time.time() - self.time0
+        update_pipeline_metadata(self, runtime, n)
         m = save_model(self, pipeline_id=self.pid)
         if m:
             update_status(
