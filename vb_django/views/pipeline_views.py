@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from vb_django.authentication import ExpiringTokenAuthentication as TokenAuthentication
 from vb_django.models import Pipeline, Project, Dataset, Model
 from vb_django.app.metadata import Metadata
 from vb_django.serializers import PipelineSerializer

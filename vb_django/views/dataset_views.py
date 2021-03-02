@@ -1,14 +1,12 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from vb_django.authentication import ExpiringTokenAuthentication as TokenAuthentication
 from vb_django.models import Dataset
 from vb_django.serializers import DatasetSerializer
 from vb_django.permissions import IsOwner
 from vb_django.app.metadata import Metadata
 from vb_django.app.statistics import DatasetStatistics
-from io import StringIO
-import pandas as pd
 from vb_django.utilities import load_dataset, load_request
 
 

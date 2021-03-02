@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from vb_django.authentication import ExpiringTokenAuthentication as TokenAuthentication
 from vb_django.models import Project
 from vb_django.serializers import ProjectSerializer
 from vb_django.permissions import IsOwner

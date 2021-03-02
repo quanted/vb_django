@@ -20,10 +20,16 @@ class UserLoginView(ObtainAuthToken):
         :param kwargs:
         :return:
         """
-        response = super(UserLoginView, self).post(request, *args, **kwargs)
-        token = Token.objects.get(key=response.data['token'])
-        user = User.objects.get(id=token.user_id)
-        return Response({'id': token.user_id, 'email': user.email, 'username': user.username, 'token': token.key})
+        # response = super(UserLoginView, self).post(request, *args, **kwargs)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            username = serializer.validated_data['user']
+            user = User.objects.get(username=username)
+            old_token = Token.objects.get(user=user)
+            old_token.delete()
+            token = Token.objects.create(user=user)
+            return Response({'id': user.id, 'email': user.email, 'username': user.username, 'token': token.key})
+        return Response(None, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class UserView(views.APIView):
