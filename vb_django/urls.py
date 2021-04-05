@@ -70,5 +70,5 @@ urlpatterns = [
     path('info/pipelines/', pipeline_details),
 ]
 
-load_pipelines()
+load_pipelines(purge=True)
 

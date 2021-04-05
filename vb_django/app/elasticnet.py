@@ -3,10 +3,9 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNetCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+from sklearn.model_selection import RepeatedKFold
 from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
-from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.app.base_helper import BaseHelper
 
 
@@ -15,6 +14,11 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
     ptype = "enet"
     description = "placeholder description for the enet pipeline"
     hyper_parameters = {
+        "do_prep": {
+            "type": "str",
+            "options": ['True', 'False'],
+            "value": 'True'
+        },
         "impute_strategy": {
             "type": "str",
             "options": ['impute_knn5'],
@@ -25,11 +29,6 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
             "options": "1:8",
             "value": 4
         },
-        "cv_strategy": {
-            "type": "str",
-            "options": ['quantile'],
-            "value": 'quantile'
-        },
         "groupcount": {
             "type": "int",
             "options": "1:5",
@@ -38,17 +37,22 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id=None):
+    def __init__(self, pipeline_id, do_prep='True', prep_dict=None, impute_strategy=None,
+                 gridpoints=4, inner_cv=None, groupcount=None,
+                 float_idx=None, cat_idx=None, bestT=False):
         self.pid = pipeline_id
-        self.gridpoints = self.hyper_parameters["gridpoints"]["value"]
-        self.cv_strategy = self.hyper_parameters["cv_strategy"]["value"]
-        self.groupcount = self.hyper_parameters["groupcount"]["value"]
-        self.float_idx = None
-        self.cat_idx = None
-        self.bestT = False
-        self.impute_strategy = self.hyper_parameters["impute_strategy"]["value"]
+        self.do_prep = do_prep == 'True'
+        self.gridpoints = gridpoints
+        self.groupcount = groupcount
+        self.float_idx = float_idx
+        self.cat_idx = cat_idx
+        self.bestT = bestT
+        self.inner_cv = inner_cv
+        self.prep_dict = {'impute_strategy': self.hyper_parameters["impute_strategy"]["value"]} if prep_dict is None else prep_dict
+        if impute_strategy:
+            self.prep_dict["impute_strategy"] = impute_strategy
         self.flags = None
-        super().__init__(self.pid)
+        BaseHelper.__init__(self)
 
     def set_params(self, hyper_parameters):
         if hyper_parameters is None:
@@ -72,21 +76,27 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
             gp_range = self.hyper_parameters["groupcount"]["options"].split(":")
             if int(gp_range[0]) <= int(hyper_parameters["groupcount"]) <= int(gp_range[1]):
                 self.groupcount = int(hyper_parameters["groupcount"])
+        if "prep_dict" in hyper_parameters.keys():
+            self.prep_dict = hyper_parameters["prep_dict"]
+        if "inner_cv" in hyper_parameters.keys():
+            self.inner_cv = hyper_parameters["inner_cv"]
 
-    def get_estimator(self):
-        if self.cv_strategy:
-            inner_cv = RegressorQStratifiedCV(n_splits=10, n_repeats=5, strategy=self.cv_strategy, random_state=0,
-                                                 groupcount=self.groupcount)
+    def get_pipe(self, ):
+        if self.inner_cv is None:
+            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
         else:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=5, random_state=0)
+            inner_cv = self.inner_cv
         gridpoints = self.gridpoints
-        param_grid = {'l1_ratio': np.logspace(-2, -.03, gridpoints)}
+        l1_ratio = 1 - np.logspace(-2, -.03, gridpoints)
         steps = [
-            ('prep', MissingValHandler(strategy=self.impute_strategy, cat_idx=self.cat_idx)),
             ('scaler', StandardScaler()),
-            ('reg', GridSearchCV(ElasticNetCV(cv=inner_cv, normalize=False), param_grid=param_grid))]
+            ('reg', ElasticNetCV(cv=inner_cv, normalize=False, l1_ratio=l1_ratio))]
 
         if self.bestT:
-            steps = [steps[0], ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))), *steps[1:]]
-        pipe = Pipeline(steps=steps)
-        return pipe
+            steps.insert(0, ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))))
+        outerpipe = Pipeline(steps=steps)
+        if self.do_prep:
+            steps = [('prep', MissingValHandler(prep_dict=self.prep_dict)),
+                     ('post', outerpipe)]
+            outerpipe = Pipeline(steps=steps)
+        return outerpipe

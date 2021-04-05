@@ -9,6 +9,10 @@ from vb_django.serializers import PipelineSerializer
 from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject, IsOwnerOfDataset, IsOwnerOfModel
 from vb_django.task_controller import DaskTasks
 from vb_django.utilities import load_request
+import logging
+
+logger = logging.getLogger("vb_django")
+logger.setLevel(logging.DEBUG)
 
 
 class PipelineView(viewsets.ViewSet):
@@ -198,10 +202,14 @@ class PipelineView(viewsets.ViewSet):
             completed = False
             if "stage" in metadata.keys():
                 i = metadata["stage"].split("/")
-                if int(i[0]) == int(i[1]):
-                    completed = True
+                try:
+                    if int(i[0]) == int(i[1]):
+                        completed = True
+                except Exception as e:
+                    logger.error("Request Error: {}".format(e))
+                    logger.error("STAGE: {}".format(metadata["stage"]))
                 if completed:
-                    #TODO: Add additional pipeline completion results
+                    # TODO: Add additional pipeline completion results
                     models = Model.objects.filter(pipeline=pipeline)
                     model_details = []
                     for m in models:
@@ -219,8 +227,8 @@ class PipelineView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
-    @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
-    def predict(self, request):
+    @action(detail=False, methods=["POST"], name="Evaluate a fitted model")
+    def evaluate(self, request):
         input_data = load_request(request)
         required_parameters = ["project_id", "model_id"]
         if set(required_parameters).issubset(input_data.keys()):
@@ -247,11 +255,47 @@ class PipelineView(viewsets.ViewSet):
                     message.append("No model found for id: {}".format(input_data["model_id"]))
                 return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
             response = {}
-            if "data" in input_data.keys():
-                data = str(input_data["data"])
-            else:
-                data = None
-            results = DaskTasks.make_prediction(project.id, model.id, data)
+            results = DaskTasks.evaluate(project.id, model.id)
+            response["project_id"] = project.id
+            response["pipeline_id"] = model.pipeline.id
+            response["model_id"] = model.id
+            response["dataset_id"] = project.dataset
+            response["results"] = results
+            return Response(response, status=status.HTTP_200_OK)
+        data = "Missing required parameters: {}".format(", ".join(required_parameters))
+        response_status = status.HTTP_200_OK
+        return Response(data, status=response_status)
+
+    @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
+    def predict(self, request):
+        input_data = load_request(request)
+        required_parameters = ["project_id", "model_id", "data"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                model = Model.objects.get(id=int(input_data["model_id"]))
+                if not IsOwnerOfModel().has_object_permission(request, self, model):
+                    permissions.append("Unauthorized to access pipeline")
+            except Model.DoesNotExist:
+                model = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if model is None or project is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if model is None:
+                    message.append("No model found for id: {}".format(input_data["model_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            response = {}
+            data = str(input_data["data"])
+            results = DaskTasks.predict(project.id, model.id, data)
             response["project_id"] = project.id
             response["pipeline_id"] = model.pipeline.id
             response["model_id"] = model.id

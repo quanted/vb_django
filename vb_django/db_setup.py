@@ -7,8 +7,11 @@ logger = logging.getLogger("vb_django")
 logger.setLevel(logging.INFO)
 
 
-def load_pipelines():
+def load_pipelines(purge: bool = False):
     pl = pipelines
+    if purge:
+        logger.info("Purging existing pipeline-instance data")
+        PipelineInstance.objects.all().delete()
     logger.info("Setting up and loading pipeline instance hyper-parameters and metadata")
     print("Setting up and loading pipeline instance hyper-parameters and metadata")
     for name, p in pl.items():
