@@ -5,6 +5,7 @@ from vb_django.app.base_helper import MultiPipe, FCombo, NullModel
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.utilities import update_status, save_model, update_pipeline_metadata
 import logging
+import time
 
 logger = logging.getLogger("vb_dask:task")
 logger.setLevel(logging.DEBUG)
@@ -84,6 +85,7 @@ class VBHelper:
         self.step_n = 16
         self.logger.log("Initializating global input parameters.", self.step_n)
         self.cv_n_jobs = cv_n_jobs
+        self.cv_strategy = cv_strategy
         self.run_stacked = run_stacked == 'True'
         self.test_share = test_share
         self.rs = random_state
@@ -153,6 +155,7 @@ class VBHelper:
     def setPipeDict(self, pipe_dict):
         self.logger.log("Estimator(s) setup started...", self.step_n)
         if self.run_stacked:
+            logger.info("Running stacked pipeline")
             self.estimator_dict = {'multi_pipe': {'pipe': MultiPipe, 'pipe_kwargs': {
                 'pipelist': list(pipe_dict.items())}}}  # list...items() creates a list of tuples...
         else:
@@ -162,47 +165,37 @@ class VBHelper:
     def setModelDict(self, pipe_dict=None):
         self.logger.log("Model(s) initialization started...", self.step_n)
         if pipe_dict is None:
+            pipe_dict = {}
             if self.run_stacked:
                 e_list = self.estimator_dict['multi_pipe']['pipe_kwargs']['pipelist']
             else:
-                e_list = self.estimator_dict
+                e_list = []
+                for n, p in self.estimator_dict.items():
+                    e_list.append([n, p])
             for e in e_list:
-                e_args = e[1]['pipe_kwargs']
-                e_args["pipeline_id"] = self.id
-                initialized = False
-                pipe = None
-                while not initialized:
-                    try:
-                        pipe = e[1]['pipe'](**e_args)
-                        initialized = True
-                    except TypeError as te:
-                        e_name = str(te).split("'")[1]
-                        logger.error("Removing '{}' from pipeline arguments".format(e_name))
-                        if e_name in e_args.keys():
-                            del e_args[e_name]
-                        else:
-                            raise Exception
-                self.model_dict[e[0]] = pipe
-        else:
-            model_dict = {}
-            for key, val in pipe_dict.items():
-                e_args = val['pipe_kwargs']
-                e_args["pipeline_id"] = self.id
-                initialized = False
-                pipe = None
-                while not initialized:
-                    try:
-                        pipe = val['pipe'](**e_args)
-                        initialized = True
-                    except TypeError as te:
-                        e_name = str(te).split("'")[1]
-                        logger.error("Removing '{}' from pipeline arguments".format(e_name))
-                        if e_name in e_args.keys():
-                            del e_args[e_name]
-                        else:
-                            raise Exception
-                model_dict[key] = pipe
-            self.model_dict = model_dict
+                pipe_dict[e[0]] = e[1]
+        model_dict = {}
+        for key, val in pipe_dict.items():
+            e_args = val['pipe_kwargs']
+            e_args["pipeline_id"] = self.id
+            initialized = False
+            pipe = None
+            while not initialized:
+                try:
+                    pipe = val['pipe'](**e_args)
+                    initialized = True
+                except TypeError as te:
+                    e_name = str(te).split("'")[1]
+                    logger.error("Removing '{}' from pipeline arguments".format(e_name))
+                    if e_name in e_args.keys() and len(e_args) > 0:
+                        del e_args[e_name]
+                    else:
+                        raise Exception
+                except Exception as ex:
+                    logger.error("Model Initialization error: {}".format(ex))
+                    initialized = True
+            model_dict[key] = pipe
+        self.model_dict = model_dict
         self.logger.log("Model(s) initialization complete.", self.step_n)
         return self.model_dict
 
@@ -212,16 +205,23 @@ class VBHelper:
             self.model_dict[key].fit(self.X_df, self.y_df)
         self.logger.log("Estimator(s) fitting complete.", self.step_n)
 
-    def runCrossValidate(self):
+    def runCrossValidate(self, verbose=True):
         self.logger.log("Cross-validate started...", self.step_n)
         n_jobs = self.cv_n_jobs
+        if verbose:
+            logger.info("CV N-JOBS: {}".format(n_jobs))
         cv_results = {}
         new_cv_results = {}
+        cv = self.getCV()
         for estimator_name, model in self.model_dict.items():
-            cv = self.getCV()
+            start = time.time()
             model_i = cross_validate(
                 model, self.X_df, self.y_df, return_estimator=True,
-                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs)
+                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, error_score='raise')
+            end = time.time()
+            if verbose:
+                logger.info(f"SCORES - {estimator_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")
+                logger.info(f"MODELS - {estimator_name},{model_i}")
             cv_results[estimator_name] = model_i
         if self.run_stacked:
             for est_name, result in cv_results.items():
@@ -232,11 +232,15 @@ class VBHelper:
                             if not est_n in new_results:
                                 new_results[est_n] = []
                             new_results[est_n].append(m)
+                            lil_x = self.X_df.iloc[0:2]
+                            logger.info(f'est_n yhat test: {m.predict(lil_x)}')
                     for est_n in new_results:
                         if est_n in cv_results:
                             est_n += '_fcombo'
                         new_cv_results[est_n] = {'estimator': new_results[est_n]}
             cv_results = {**new_cv_results, **cv_results}
+            if verbose:
+                logger.info("CV Results: {}".format(cv_results))
         self.cv_results = cv_results
         self.logger.log("Cross-validate complete.", self.step_n)
 
@@ -268,8 +272,6 @@ class VBHelper:
         err_dict = {}
         cv_y_yhat_dict = {}
         for idx, (estimator_name, result) in enumerate(self.cv_results.items()):
-            # logger.info("NAME CHECK: {}".format(estimator_name))
-            # logger.info("RESULTS CHECK: {}".format(result))
             yhat_dict[estimator_name] = []
             cv_y_yhat_dict[estimator_name] = []
             err_dict[estimator_name] = []
@@ -279,6 +281,7 @@ class VBHelper:
                 for s in range(cv_folds):  # s for split
                     m = r * cv_folds + s
                     cv_est = result['estimator'][m]
+                    # logger.info("ESTIMATOR CHECK: {}".format(cv_est))
                     test_rows = test_idx_list[m]
                     yhat_arr = cv_est.predict(self.X_df.iloc[test_rows])
                     yhat[test_rows] = yhat_arr
@@ -286,7 +289,6 @@ class VBHelper:
                     cv_y_yhat_dict[estimator_name].append((self.y_df.iloc[test_rows].to_numpy(), yhat_arr))
                 yhat_dict[estimator_name].append(yhat)
                 err_dict[estimator_name].append(err)
-
         self.cv_yhat_dict = yhat_dict
         self.cv_y_yhat_dict = cv_y_yhat_dict
         self.cv_err_dict = err_dict

@@ -51,13 +51,16 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=10, n_repeats=1, random_state=0)
         else:
             inner_cv = self.inner_cv
 
-        param_grid = {}  # 'max_depth':list(range(2,5)),
+        param_grid = {'max_depth': list(range(1, 3)),
+                      'n_estimators': [75, 100]
+                      }
+        steps = [('reg', GridSearchCV(GradientBoostingRegressor(random_state=0), param_grid=param_grid, cv=inner_cv, n_jobs=1))]
+        # steps = [('reg', GradientBoostingRegressor(random_state=0))]
 
-        steps = [('reg', GridSearchCV(GradientBoostingRegressor(random_state=0), param_grid=param_grid, cv=inner_cv))]
         if self.bestT:
             steps.insert(0, 'xtransform', ColumnBestTransformer(float_k=len(self.float_idx)))
         outerpipe = Pipeline(steps=steps)
