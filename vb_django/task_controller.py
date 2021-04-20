@@ -19,7 +19,7 @@ import socket
 import logging
 
 
-logger = logging.getLogger("vb_dask")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 dask_scheduler = os.getenv("DASK_SCHEDULER", "tcp://" + socket.gethostbyname(socket.gethostname()) + ":8786")
@@ -49,6 +49,16 @@ class DaskTasks:
             fire_and_forget(client.submit(DaskTasks.execute_task, int(project_id), int(dataset_id), int(pipeline_id)))
         else:
             DaskTasks.execute_task(int(project_id), int(dataset_id), int(pipeline_id))
+
+    @staticmethod
+    def refit_task(project_id, model_id, selected_models: dict):
+        docker = bool(os.getenv("IN_DOCKER", False))
+
+        if docker:
+            client = Client(dask_scheduler)
+            fire_and_forget(client.submit(DaskTasks.set_prediction_estimators, int(project_id), int(model_id), selected_models))
+        else:
+            DaskTasks.set_prediction_estimators(int(project_id), int(model_id), selected_models)
 
     @staticmethod
     def execute_task(project_id, dataset_id, pipeline_id):
@@ -162,9 +172,50 @@ class DaskTasks:
         return results
 
     @staticmethod
-    def predict(project_id, model_id, data: str):
-        # TODO: Need to implement.
+    def set_prediction_estimators(project_id, model_id, selected_models: dict):
         project = Project.objects.get(id=int(project_id))
+        dataset = Dataset.objects.get(id=project.dataset)
+        df = load_dataset(dataset.id, dataset)
+        project_metadata = Metadata(parent=Project.objects.get(id=project.id)).get_metadata("ProjectMetadata")
+
+        target_label = "response" if "target" not in project_metadata.keys() else project_metadata["target"]
+        features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
+        target = df[target_label]
+        if features_label:
+            features_list = json.loads(features_label.replace("\'", "\""))
+            features = df[features_list]
+        else:
+            features = df.drop(target_label, axis=1)
         model = Model.objects.get(id=int(model_id))
-        df = pd.read_csv(StringIO(data))
-        return ""
+        m = load_model(model.id, model.model)
+        # TODO: update predictive_model_type from model metadata
+        m.refitPredictiveModels(selected_models=selected_models, y_df=target, x_df=features)
+        m.save(n=4, model_id=model_id)
+
+    @staticmethod
+    def predict(project_id, model_id, data: str):
+        # TODO: Determine need for checking input data structure (labels/types) against the features (labels/types)
+        # project = Project.objects.get(id=int(project_id))
+        # dataset = Dataset.objects.get(id=project.dataset_id)
+        # df = load_dataset(dataset.id, dataset)
+        # project_metadata = Metadata(parent=Project.objects.get(id=project.id)).get_metadata("ProjectMetadata")
+        # target_label = "response" if "target" not in project_metadata.keys() else project_metadata["target"]
+        # features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
+        # target = df[target_label]
+        # if features_label:
+        #     features_list = json.loads(features_label.replace("\'", "\""))
+        #     features = df[features_list]
+        # else:
+        #     features = df.drop(target_label, axis=1)
+        model = Model.objects.get(id=int(model_id))
+        m = load_model(model.id, model.model)
+        logger.warning(f"Model: {m}")
+        try:
+            df = pd.read_csv(StringIO(data))
+            logger.warning(f"Predictive Models:\n{m.predictive_models}")
+            logger.warning(f"DF:\n{df}")
+            results = m.predict(df)
+            logger.warning(f"Results:\n{results}")
+        except Exception as e:
+            results = f"Error attempt to make prediction with data: {data}, error: {e}"
+        return results

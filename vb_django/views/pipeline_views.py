@@ -10,8 +10,9 @@ from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject, IsOwnerOf
 from vb_django.task_controller import DaskTasks
 from vb_django.utilities import load_request
 import logging
+import json
 
-logger = logging.getLogger("vb_django")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
@@ -266,6 +267,52 @@ class PipelineView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
+    @action(detail=False, methods=["POST"], name="Refitting model(s) for prediction")
+    def refit_model(self, request):
+        input_data = load_request(request)
+        required_parameters = ["project_id", "model_id", "predictive_models"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                model = Model.objects.get(id=int(input_data["model_id"]))
+                if not IsOwnerOfModel().has_object_permission(request, self, model):
+                    permissions.append("Unauthorized to access pipeline")
+            except Model.DoesNotExist:
+                model = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if model is None or project is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if model is None:
+                    message.append("No model found for id: {}".format(input_data["model_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            p_models = {}
+            for p in json.loads(input_data["predictive_models"]):
+                p_models[p[0]] = int(p[1])
+            m = Metadata(model, json.dumps({"predictive_models": p_models}))
+            meta = m.set_metadata("ModelMetadata")
+
+            response = {}
+            DaskTasks.refit_task(project.id, model.id, p_models)
+            response["project_id"] = project.id
+            response["pipeline_id"] = model.pipeline.id
+            response["model_id"] = model.id
+            response["dataset_id"] = project.dataset
+            response["model_metadata"] = meta
+            response["status"] = "Initiated refit for specified models for prediction"
+            return Response(response, status=status.HTTP_200_OK)
+        data = "Missing required parameters: {}".format(", ".join(required_parameters))
+        response_status = status.HTTP_200_OK
+        return Response(data, status=response_status)
+
     @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
     def predict(self, request):
         input_data = load_request(request)
@@ -299,6 +346,8 @@ class PipelineView(viewsets.ViewSet):
             response["project_id"] = project.id
             response["pipeline_id"] = model.pipeline.id
             response["model_id"] = model.id
+            m = Metadata(model)
+            response["model_metadata"] = m.get_metadata("ModelMetadata")
             response["dataset_id"] = project.dataset
             response["results"] = results
             return Response(response, status=status.HTTP_200_OK)

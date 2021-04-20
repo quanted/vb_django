@@ -111,7 +111,6 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
         fitted_ipipe_dict = {}  # i for individual
         for pname, pipe in pipe_dict.items():
             fitted_steps = [('prep', prep), ('post', pipe)]
-            # fitted_ipipe_dict[pname]=CompositePostFitPipe(fitted_steps)
             fitted_ipipe_dict[pname] = FCombo(fitted_steps)
         return fitted_ipipe_dict
 

@@ -4,7 +4,9 @@ from sklearn.model_selection import cross_validate, train_test_split, RepeatedKF
 from vb_django.app.base_helper import MultiPipe, FCombo, NullModel
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.utilities import update_status, save_model, update_pipeline_metadata
+import pandas as pd
 import logging
+import copy
 import time
 
 logger = logging.getLogger("vb_dask:task")
@@ -109,6 +111,9 @@ class VBHelper:
         self.cv_score_dict_means = {}
         self.cv_score_dict = {}
 
+        self.predictive_models = {}
+        self.predictive_model_type = "single"
+
         self.setProjectCVDict(cv_folds, cv_reps, cv_strategy)
         self.logger.log("Initialization complete.", self.step_n)
 
@@ -155,7 +160,7 @@ class VBHelper:
     def setPipeDict(self, pipe_dict):
         self.logger.log("Estimator(s) setup started...", self.step_n)
         if self.run_stacked:
-            logger.info("Running stacked pipeline")
+            # logger.info("Running stacked pipeline")
             self.estimator_dict = {'multi_pipe': {'pipe': MultiPipe, 'pipe_kwargs': {
                 'pipelist': list(pipe_dict.items())}}}  # list...items() creates a list of tuples...
         else:
@@ -205,7 +210,7 @@ class VBHelper:
             self.model_dict[key].fit(self.X_df, self.y_df)
         self.logger.log("Estimator(s) fitting complete.", self.step_n)
 
-    def runCrossValidate(self, verbose=True):
+    def runCrossValidate(self, verbose=False):
         self.logger.log("Cross-validate started...", self.step_n)
         n_jobs = self.cv_n_jobs
         if verbose:
@@ -232,8 +237,8 @@ class VBHelper:
                             if not est_n in new_results:
                                 new_results[est_n] = []
                             new_results[est_n].append(m)
-                            lil_x = self.X_df.iloc[0:2]
-                            logger.info(f'est_n yhat test: {m.predict(lil_x)}')
+                            # lil_x = self.X_df.iloc[0:2]
+                            # logger.info(f'est_n yhat test: {m.predict(lil_x)}')
                     for est_n in new_results:
                         if est_n in cv_results:
                             est_n += '_fcombo'
@@ -343,10 +348,33 @@ class VBHelper:
         self.cv_score_dict = cv_score_dict
         self.logger.log("Building CV Score Dict complete.", self.step_n)
 
-    def save(self):
-        self.logger.log("Saving results...", self.step_n)
-        m = save_model(self, pipeline_id=self.id)
+    def refitPredictiveModels(self, selected_models: dict, y_df: pd.DataFrame, x_df: pd.DataFrame, verbose: bool=False):
+        # TODO: Add different process for each possible predictive_model_type
+        self.logger = VBLogger(self.id)
+        self.logger.log("Refitting specified models for prediction...", 4)
+        predictive_models = {}
+        for name, indx in selected_models.items():
+            logger.info(f"Name: {name}, Index: {indx}")
+            if name in self.cv_results.keys():
+                if len(self.cv_results[name]["estimator"]) >= indx >= 0:
+                    predictive_models[f"{name}-{indx}"] = copy.copy(self.cv_results[name]["estimator"][indx])
+        logger.info(f"Models:{predictive_models}")
+        for name, est in predictive_models.items():
+            predictive_models[name] = est.fit(x_df, y_df)
+        self.predictive_models = predictive_models
+        self.logger.log("Refitting model for prediction complete.", 4)
+
+    def predict(self, x_df: pd.DataFrame):
+        results = {}
+        for name, est in self.predictive_models.items():
+            results[name] = est.predict(x_df)
+        return results
+
+    def save(self, n=None, model_id=None):
+        n = self.step_n if n is None else n
+        self.logger.log("Saving results...", n)
+        m = save_model(self, model_id=model_id, pipeline_id=self.id)
         if m:
-            self.logger.log("Saving results complete", self.step_n)
+            self.logger.log("Saving results complete", n)
         else:
-            self.logger.log("Unable to save results", self.step_n, error=True)
+            self.logger.log("Unable to save results", n, error=True)

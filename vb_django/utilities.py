@@ -67,10 +67,12 @@ def save_model(model, model_id=None, pipeline_id=None, replace=True):
         try:
             o_model = Model.objects.get(id=int(model_id))
         except Model.DoesNotExist:
+            logger.warning(f"ERROR - Model: {model_id} does not exist")
             return None
         o_model.model = comp_model
         o_model.save()
         m = o_model
+        logger.info(f"Model: {model_id} successfully updated")
     if pipeline_id and not model_id:
         pipeline = Pipeline.objects.get(id=int(pipeline_id))
         existing_m = Model.objects.filter(pipeline=pipeline)
@@ -81,8 +83,9 @@ def save_model(model, model_id=None, pipeline_id=None, replace=True):
         name = "{}-{}".format(pipeline.type, l+1)
         m = Model(pipeline=pipeline, name=name, description="", model=comp_model)
         m.save()
+        logger.info(f"Model: {m.id} successfully created.")
     if m:
-        logger.info("Model ID: {} saved; raw {} bytes; compressed {} bytes".format(model_id, sys.getsizeof(raw_model), sys.getsizeof(comp_model)))
+        logger.info("Pipeline ID: {} saved; raw {} bytes; compressed {} bytes".format(model_id, sys.getsizeof(raw_model), sys.getsizeof(comp_model)))
     return m
 
 
