@@ -356,8 +356,7 @@ class VBHelper:
         for name, indx in selected_models.items():
             logger.info(f"Name: {name}, Index: {indx}")
             if name in self.cv_results.keys():
-                if len(self.cv_results[name]["estimator"]) >= indx >= 0:
-                    predictive_models[f"{name}-{indx}"] = copy.copy(self.cv_results[name]["estimator"][indx])
+                predictive_models[f"{name}-{indx}"] = copy.copy(self.cv_results[name]["estimator"][0])
         logger.info(f"Models:{predictive_models}")
         for name, est in predictive_models.items():
             predictive_models[name] = est.fit(x_df, y_df)

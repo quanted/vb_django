@@ -73,7 +73,7 @@ class PipelineView(viewsets.ViewSet):
 
     def update(self, request, pk=None):
         pipeline_inputs = load_request(request)
-        serializer = self.serializer_class(data=request.data.dict(), context={'request': request})
+        serializer = self.serializer_class(data=pipeline_inputs, context={'request': request})
 
         try:
             project = Project.objects.get(id=int(pipeline_inputs["project"]))

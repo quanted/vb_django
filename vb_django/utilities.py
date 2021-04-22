@@ -125,19 +125,9 @@ def update_pipeline_metadata(pipeline, runtime, n):
 
 def load_request(request):
     data = None
-    if request.body:
-        try:
-            data = json.loads(request.body.decode('utf-8'))
-        except Exception:
-            data = None
-    if request.POST and data is None:
-        try:
-            data = request.POST.dict()
-        except Exception:
-            data = None
-    if request.data and data is None:
-        try:
-            data = request.data.dict()
-        except Exception:
-            data = None
+    if "multipart/form-data" in request.content_type:
+        data = request.POST.dict()
+    elif "application/json" in request.content_type:
+        data = request.data
+
     return data
