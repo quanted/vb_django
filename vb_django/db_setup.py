@@ -9,7 +9,7 @@ logger.setLevel(logging.INFO)
 
 def load_pipelines(purge: bool = False):
     pl = pipelines
-    if purge:
+    if purge and not PipelineInstance.DoesNotExist:
         logger.info("Purging existing pipeline-instance data")
         PipelineInstance.objects.all().delete()
     logger.info("Setting up and loading pipeline instance hyper-parameters and metadata")
