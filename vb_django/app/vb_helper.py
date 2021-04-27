@@ -348,10 +348,14 @@ class VBHelper:
         self.cv_score_dict = cv_score_dict
         self.logger.log("Building CV Score Dict complete.", self.step_n)
 
-    def refitPredictiveModels(self, selected_models: dict, y_df: pd.DataFrame, x_df: pd.DataFrame, verbose: bool=False):
+    def refitPredictiveModels(self, selected_models: dict, verbose: bool=False):
         # TODO: Add different process for each possible predictive_model_type
         self.logger = VBLogger(self.id)
         self.logger.log("Refitting specified models for prediction...", 4)
+
+        X_df = self.X_df if self.X_test is None else self.X_test
+        y_df = self.y_df if self.y_test is None else self.y_test
+
         predictive_models = {}
         for name, indx in selected_models.items():
             logger.info(f"Name: {name}, Index: {indx}")
@@ -359,7 +363,7 @@ class VBHelper:
                 predictive_models[f"{name}-{indx}"] = copy.copy(self.cv_results[name]["estimator"][0])
         logger.info(f"Models:{predictive_models}")
         for name, est in predictive_models.items():
-            predictive_models[name] = est.fit(x_df, y_df)
+            predictive_models[name] = est.fit(X_df, y_df)
         self.predictive_models = predictive_models
         self.logger.log("Refitting model for prediction complete.", 4)
 
