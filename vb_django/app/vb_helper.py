@@ -112,6 +112,7 @@ class VBHelper:
         self.cv_score_dict_means = {}
         self.cv_score_dict = {}
 
+        self.model_averaging_weights = {}
         self.prediction_models = {}
         self.prediction_model_type = "single"
 
@@ -366,54 +367,62 @@ class VBHelper:
         self.prediction_models = prediction_models
         self.logger.log("Refitting model for prediction complete.", 4, message="Model selection")
 
-    def predict(self, x_df: pd.DataFrame):
-        results = {}
-        for name, est in self.prediction_models.items():
-            results[name] = est.predict(x_df)
-        n = 0
-        value = 0
+    def setModelAveragingWeights(self):
+        pipe_names = list(self.prediction_models.keys())
+        model_count = len(self.prediction_models)
         if self.prediction_model_type == "average":
-            for name, p in results.items():
-                value += p
-                n += 1
-            results["avg"] = value/n
+            self.model_averaging_weights = {
+                pipe_names[i]: {
+                    scorer: 1 / model_count for scorer in self.scorer_list
+                } for i in range(model_count)
+            }
         elif self.prediction_model_type == "cv-weighted":
-            labels = self.prediction_models.keys()
             totals = {
                 "neg_mean_squared_error": 0,
                 "neg_mean_absolute_error": 0,
                 "r2": 0
             }
-            value = {
-                "neg_mean_squared_error": 0,
-                "neg_mean_absolute_error": 0,
-                "r2": 0
-            }
             for name, p in self.cv_score_dict_means.items():
-                if name in labels:
-                    totals["neg_mean_squared_error"] += 1/abs(p["neg_mean_squared_error"])
-                    totals["neg_mean_absolute_error"] += 1/abs(p["neg_mean_absolute_error"])
+                if name in pipe_names:  # leave out non-selected pipelines
+                    totals["neg_mean_squared_error"] += 1 / abs(p["neg_mean_squared_error"])
+                    totals["neg_mean_absolute_error"] += 1 / abs(p["neg_mean_absolute_error"])
                     totals["r2"] += p["r2"] if p["r2"] > 0 else 0
             weights = {}
-            for name, p in results.items():
-                label = name.split("-")
-                label = f"{label[0]}-{label[1]}"
-                weights[name] = {}
-                for scorer, score in self.cv_score_dict_means[label].items():
-                    # logger.warning(f"Scorer: {scorer}, Score: {score}")
-                    if "neg" in scorer:
-                        w = (1/(abs(score)))/totals[scorer]
+            for pipe_name in pipe_names:
+                weights[pipe_name] = {}
+                for scorer, score in self.cv_score_dict_means[pipe_name].items():
+                    logger.warning(f"Scorer: {scorer}, Score: {score}, Total:{totals[scorer]}")
+                    if "neg" == scorer[:3]:
+                        w = (1 / (abs(score))) / totals[scorer]
                     elif scorer == "r2":
                         score = score if score > 0 else 0
-                        w = score / totals[scorer]
+                        w = score / totals[scorer] if totals[scorer] != 0 else 0
                     else:
                         w = abs(score) / totals[scorer]
+                    weights[pipe_name][scorer] = w
+            self.model_averaging_weights = weights
 
-                    weights[name][scorer] = w
-                    value[scorer] += w * p
-            results["weights"] = weights
-            results["cv-avg"] = value
-        results["final-test-predictions"] = self.get_test_predictions()
+    def getPredictionValues(self, x_df):
+        prediction_results = self.predict(x_df)
+        test_results = self.predict(self.X_test)
+        collection = {
+            'prediction_results': prediction_results,
+            'test_results': test_results,
+            'test_y': self.y_test
+        }
+        return collection
+
+    def predict(self, x_df: pd.DataFrame):
+        if self.prediction_model_type == "average" or self.prediction_model_type == "cv-weighted":
+            self.setModelAveragingWeights()
+        results = {}
+        wtd_yhats = {scorer: np.zeros(x_df.shape[0]) for scorer in self.scorer_list}
+        for name, est in self.prediction_models.items():
+            results[name] = est.predict(x_df)
+            for scorer, weights in self.model_averaging_weights[name].items():
+                wtd_yhats[scorer] += weights * results[name]
+        results["weights"] = self.model_averaging_weights
+        results["prediction"] = wtd_yhats
         return results
 
     def get_test_predictions(self):

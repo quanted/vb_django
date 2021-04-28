@@ -154,11 +154,11 @@ class DaskTasks:
                 vbhelper.buildCVScoreDict()
             else:
                 vbhelper.fitEstimators()
-            # try:
-            #     model = Model.objects.get(pipeline=pipeline)
-            #     model_id = model.id
-            # except Model.DoesNotExist:
-            #     model_id = None
+            try:
+                model = Model.objects.get(pipeline=pipeline)
+                model_id = model.id
+            except Model.DoesNotExist:
+                model_id = None
             vbhelper.save(message="Cross validation")
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",
@@ -199,7 +199,7 @@ class DaskTasks:
         m = load_model(model.id, model.model)
         try:
             df = pd.read_csv(StringIO(data))
-            results = m.predict(df)
+            results = m.getPredictionValues(df)
         except Exception as e:
             results = f"Error attempt to make prediction with data: {data}, error: {e}"
         return results
