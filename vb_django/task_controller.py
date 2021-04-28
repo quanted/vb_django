@@ -154,7 +154,12 @@ class DaskTasks:
                 vbhelper.buildCVScoreDict()
             else:
                 vbhelper.fitEstimators()
-            vbhelper.save(message="Cross validation")
+            try:
+                model = Model.objects.get(pipeline=pipeline)
+                model_id = model.id
+            except Model.DoesNotExist:
+                model_id = None
+            vbhelper.save(model_id=model_id, message="Cross validation")
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",
                           "-0/16",
@@ -182,8 +187,8 @@ class DaskTasks:
         model = Model.objects.get(id=int(model_id))
         m = load_model(model.id, model.model)
         model_metadata = Metadata(parent=model).get_metadata("ModelMetadata")
-        m.predictive_model_type = model_metadata["predictive_model_type"] if "predictive_model_type" in model_metadata.keys() else "single"
-        m.refitPredictiveModels(selected_models=selected_models)
+        m.prediction_model_type = model_metadata["prediction_model_type"] if "prediction_model_type" in model_metadata.keys() else "single"
+        m.refitPredictionModels(selected_models=selected_models)
         m.save(n=4, model_id=model_id, message="Model selection")
 
     @staticmethod
@@ -192,14 +197,9 @@ class DaskTasks:
         project = Project.objects.get(id=int(project_id))
         model = Model.objects.get(id=int(model_id))
         m = load_model(model.id, model.model)
-        # logger.warning(f"Model: {m}")
         try:
             df = pd.read_csv(StringIO(data))
-            # logger.warning(f"Predictive Models:\n{m.predictive_models}")
-            # logger.warning(f"DF:\n{df}")
-            logger.warning(f"Type:{m.predictive_model_type}")
             results = m.predict(df)
-            # logger.warning(f"Results:\n{results}")
         except Exception as e:
             results = f"Error attempt to make prediction with data: {data}, error: {e}"
         return results

@@ -112,8 +112,8 @@ class VBHelper:
         self.cv_score_dict_means = {}
         self.cv_score_dict = {}
 
-        self.predictive_models = {}
-        self.predictive_model_type = "single"
+        self.prediction_models = {}
+        self.prediction_model_type = "single"
 
         self.setProjectCVDict(cv_folds, cv_reps, cv_strategy)
         self.logger.log("Initialization complete.", self.step_n, message="Cross validation")
@@ -349,37 +349,36 @@ class VBHelper:
         self.cv_score_dict = cv_score_dict
         self.logger.log("Building CV Score Dict complete.", self.step_n, message="Cross validation")
 
-    def refitPredictiveModels(self, selected_models: dict, verbose: bool=False):
+    def refitPredictionModels(self, selected_models: dict, verbose: bool=False):
         self.logger = VBLogger(self.id)
         self.logger.log("Refitting specified models for prediction...", 4, message="Model selection")
 
         X_df = self.X_df
         y_df = self.y_df
 
-        predictive_models = {}
+        prediction_models = {}
         for name, indx in selected_models.items():
             # logger.info(f"Name: {name}, Index: {indx}")
             if name in self.cv_results.keys():
-                predictive_models[f"{name}"] = copy.copy(self.cv_results[name]["estimator"][0])
-        # logger.info(f"Models:{predictive_models}")
-        for name, est in predictive_models.items():
-            predictive_models[name] = est.fit(X_df, y_df)
-        self.predictive_models = predictive_models
+                prediction_models[f"{name}"] = copy.copy(self.cv_results[name]["estimator"][0])
+        for name, est in prediction_models.items():
+            prediction_models[name] = est.fit(X_df, y_df)
+        self.prediction_models = prediction_models
         self.logger.log("Refitting model for prediction complete.", 4, message="Model selection")
 
     def predict(self, x_df: pd.DataFrame):
         results = {}
-        for name, est in self.predictive_models.items():
+        for name, est in self.prediction_models.items():
             results[name] = est.predict(x_df)
         n = 0
         value = 0
-        if self.predictive_model_type == "average":
+        if self.prediction_model_type == "average":
             for name, p in results.items():
                 value += p
                 n += 1
             results["avg"] = value/n
-        elif self.predictive_model_type == "cv-weighted":
-            labels = self.predictive_models.keys()
+        elif self.prediction_model_type == "cv-weighted":
+            labels = self.prediction_models.keys()
             totals = {
                 "neg_mean_squared_error": 0,
                 "neg_mean_absolute_error": 0,
@@ -414,7 +413,7 @@ class VBHelper:
         test_results = {}
         if self.X_test is None:
             return test_results
-        for name, est in self.predictive_models.items():
+        for name, est in self.prediction_models.items():
             r = {
                 "y": self.y_test.to_list(),
                 "yhat": est.predict(self.X_test)

@@ -270,7 +270,7 @@ class PipelineView(viewsets.ViewSet):
     @action(detail=False, methods=["POST"], name="Refitting model(s) for prediction")
     def refit_model(self, request):
         input_data = load_request(request)
-        required_parameters = ["project_id", "model_id", "predictive_models"]
+        required_parameters = ["project_id", "model_id", "prediction_models", "prediction_model_type"]
         if set(required_parameters).issubset(input_data.keys()):
             permissions = []
             try:
@@ -295,9 +295,9 @@ class PipelineView(viewsets.ViewSet):
                     message.append("No model found for id: {}".format(input_data["model_id"]))
                 return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
             p_models = {}
-            for p in json.loads(input_data["predictive_models"]):
+            for p in json.loads(input_data["prediction_models"]):
                 p_models[p[0]] = int(p[1])
-            m = Metadata(model, json.dumps({"predictive_models": p_models, "predictive_model_type": input_data["predictive_model_type"]}))
+            m = Metadata(model, json.dumps({"prediction_models": p_models, "prediction_model_type": input_data["prediction_model_type"]}))
             meta = m.set_metadata("ModelMetadata")
 
             response = {}
