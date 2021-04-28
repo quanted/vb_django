@@ -154,12 +154,12 @@ class DaskTasks:
                 vbhelper.buildCVScoreDict()
             else:
                 vbhelper.fitEstimators()
-            try:
-                model = Model.objects.get(pipeline=pipeline)
-                model_id = model.id
-            except Model.DoesNotExist:
-                model_id = None
-            vbhelper.save(model_id=model_id, message="Cross validation")
+            # try:
+            #     model = Model.objects.get(pipeline=pipeline)
+            #     model_id = model.id
+            # except Model.DoesNotExist:
+            #     model_id = None
+            vbhelper.save(message="Cross validation")
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",
                           "-0/16",
