@@ -391,17 +391,24 @@ class VBHelper:
             }
             for name, p in self.cv_score_dict_means.items():
                 if name in labels:
-                    totals["neg_mean_squared_error"] += abs(p["neg_mean_squared_error"])
-                    totals["neg_mean_absolute_error"] += abs(p["neg_mean_absolute_error"])
-                    totals["r2"] += abs(p["r2"])
+                    totals["neg_mean_squared_error"] += 1/abs(p["neg_mean_squared_error"])
+                    totals["neg_mean_absolute_error"] += 1/abs(p["neg_mean_absolute_error"])
+                    totals["r2"] += p["r2"] if p["r2"] > 0 else 0
             weights = {}
             for name, p in results.items():
                 label = name.split("-")
                 label = f"{label[0]}-{label[1]}"
                 weights[name] = {}
                 for scorer, score in self.cv_score_dict_means[label].items():
-                    logger.warning(f"Scorer: {scorer}, Score: {score}")
-                    w = abs(score) / totals[scorer]
+                    # logger.warning(f"Scorer: {scorer}, Score: {score}")
+                    if "neg" in scorer:
+                        w = (1/(abs(score)))/totals[scorer]
+                    elif scorer == "r2":
+                        score = score if score > 0 else 0
+                        w = score / totals[scorer]
+                    else:
+                        w = abs(score) / totals[scorer]
+
                     weights[name][scorer] = w
                     value[scorer] += w * p
             results["weights"] = weights
