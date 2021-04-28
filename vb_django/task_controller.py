@@ -66,7 +66,8 @@ class DaskTasks:
         update_status(
             pipeline_id,
             "Data and Model Setup: Retrieving dataset and pipeline", "1/{}".format(pre_processing_steps),
-            log="Pipeline: {}, Type: {}, Setup: 1/{}".format(pipeline_id, None, pre_processing_steps)
+            log="Pipeline: {}, Type: {}, Setup: 1/{}".format(pipeline_id, None, pre_processing_steps),
+            message="Cross validation"
         )
         project = Project.objects.get(id=int(project_id))
         dataset = Dataset.objects.get(id=int(dataset_id))
@@ -86,7 +87,8 @@ class DaskTasks:
         update_status(
             pipeline_id,
             "Data and Model Setup: Loading data", "2/{}".format(pre_processing_steps),
-            log="Pipeline: {}, Type: {}, Setup: 2/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+            log="Pipeline: {}, Type: {}, Setup: 2/{}".format(pipeline_id, pipeline.name, pre_processing_steps),
+            message="Cross validation"
         )
 
         target = df[target_label]
@@ -100,7 +102,8 @@ class DaskTasks:
         update_status(
             pipeline_id,
             "Data and Model Setup: Loading all parameters and settings", "3/{}".format(pre_processing_steps),
-            log="Pipeline: {}, Type: {}, Setup: 3/{}".format(pipeline_id, pipeline.name, pre_processing_steps)
+            log="Pipeline: {}, Type: {}, Setup: 3/{}".format(pipeline_id, pipeline.name, pre_processing_steps),
+            message="Cross validation"
         )
         if pipeline_metadata:
             vbhelper_parameters = None if "parameters" not in pipeline_metadata.keys() else json.loads(pipeline_metadata["parameters"].replace("'", "\""))
@@ -117,7 +120,8 @@ class DaskTasks:
                 update_status(pipeline_id, "Error: VB Helper requires an estimator.",
                               "-1/{}".format(pre_processing_steps),
                               log="Pipeline: {}, Type: {}, Setup: -1/{}".format(pipeline_id, pipeline.name,
-                                                                                pre_processing_steps)
+                                                                                pre_processing_steps),
+                              message="Cross validation"
                               )
                 return
             vbhelper.setData(X_df=features, y_df=target)
@@ -150,11 +154,12 @@ class DaskTasks:
                 vbhelper.buildCVScoreDict()
             else:
                 vbhelper.fitEstimators()
-            vbhelper.save()
+            vbhelper.save(message="Cross validation")
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",
                           "-0/16",
-                          log="Pipeline: {}, Type: {}, Error: {}".format(pipeline_id, pipeline.name, e)
+                          log="Pipeline: {}, Type: {}, Error: {}".format(pipeline_id, pipeline.name, e),
+                          message="Cross validation"
                           )
 
     @staticmethod
@@ -176,9 +181,10 @@ class DaskTasks:
         project = Project.objects.get(id=int(project_id))
         model = Model.objects.get(id=int(model_id))
         m = load_model(model.id, model.model)
-        # TODO: update predictive_model_type from model metadata
+        model_metadata = Metadata(parent=model).get_metadata("ModelMetadata")
+        m.predictive_model_type = model_metadata["predictive_model_type"] if "predictive_model_type" in model_metadata.keys() else "single"
         m.refitPredictiveModels(selected_models=selected_models)
-        m.save(n=4, model_id=model_id)
+        m.save(n=4, model_id=model_id, message="Model selection")
 
     @staticmethod
     def predict(project_id, model_id, data: str):
@@ -186,13 +192,14 @@ class DaskTasks:
         project = Project.objects.get(id=int(project_id))
         model = Model.objects.get(id=int(model_id))
         m = load_model(model.id, model.model)
-        logger.warning(f"Model: {m}")
+        # logger.warning(f"Model: {m}")
         try:
             df = pd.read_csv(StringIO(data))
-            logger.warning(f"Predictive Models:\n{m.predictive_models}")
-            logger.warning(f"DF:\n{df}")
+            # logger.warning(f"Predictive Models:\n{m.predictive_models}")
+            # logger.warning(f"DF:\n{df}")
+            logger.warning(f"Type:{m.predictive_model_type}")
             results = m.predict(df)
-            logger.warning(f"Results:\n{results}")
+            # logger.warning(f"Results:\n{results}")
         except Exception as e:
             results = f"Error attempt to make prediction with data: {data}, error: {e}"
         return results

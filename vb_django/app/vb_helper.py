@@ -18,7 +18,7 @@ class VBLogger:
         self.id = pipeline_id
         self.i = 0
 
-    def log(self, status, n, i=None, log=None, error: bool = False):
+    def log(self, status, n, i=None, log=None, error: bool = False, message: str = None):
         if not log:
             log = status
         log_i = 0
@@ -33,7 +33,8 @@ class VBLogger:
             self.id,
             status,
             "{}/{}".format(log_i, n),
-            log="Pipeline: {}, {} Step: {}/{}".format(self.id, log, log_i, n)
+            log="Pipeline: {}, {} Step: {}/{}".format(self.id, log, log_i, n),
+            message=message
         )
 
 
@@ -85,7 +86,7 @@ class VBHelper:
         self.id = pipeline_id
         self.logger = VBLogger(self.id)
         self.step_n = 16
-        self.logger.log("Initializating global input parameters.", self.step_n)
+        self.logger.log("Initializating global input parameters.", self.step_n, message="Cross validation")
         self.cv_n_jobs = cv_n_jobs
         self.cv_strategy = cv_strategy
         self.run_stacked = run_stacked == 'True'
@@ -115,7 +116,7 @@ class VBHelper:
         self.predictive_model_type = "single"
 
         self.setProjectCVDict(cv_folds, cv_reps, cv_strategy)
-        self.logger.log("Initialization complete.", self.step_n)
+        self.logger.log("Initialization complete.", self.step_n, message="Cross validation")
 
     def setProjectCVDict(self, cv_folds, cv_reps, cv_strategy):
         if cv_folds is None:
@@ -131,7 +132,7 @@ class VBHelper:
         }
 
     def setData(self, X_df, y_df):
-        self.logger.log("Input data setup started...", self.step_n)
+        self.logger.log("Input data setup started...", self.step_n, message="Cross validation")
 
         # Data shuffling
         shuf = np.arange(y_df.shape[0])
@@ -155,20 +156,20 @@ class VBHelper:
             self.cat_idx = []
             self.cat_vars = []
         self.float_idx = [i for i in range(X_df.shape[1]) if i not in self.cat_idx]
-        self.logger.log("Input data setup complete.", self.step_n)
+        self.logger.log("Input data setup complete.", self.step_n, message="Cross validation")
 
     def setPipeDict(self, pipe_dict):
-        self.logger.log("Estimator(s) setup started...", self.step_n)
+        self.logger.log("Estimator(s) setup started...", self.step_n, message="Cross validation")
         if self.run_stacked:
             # logger.info("Running stacked pipeline")
             self.estimator_dict = {'multi_pipe': {'pipe': MultiPipe, 'pipe_kwargs': {
                 'pipelist': list(pipe_dict.items())}}}  # list...items() creates a list of tuples...
         else:
             self.estimator_dict = pipe_dict
-        self.logger.log("Estimator(s) setup complete.", self.step_n)
+        self.logger.log("Estimator(s) setup complete.", self.step_n, message="Cross validation")
 
     def setModelDict(self, pipe_dict=None):
-        self.logger.log("Model(s) initialization started...", self.step_n)
+        self.logger.log("Model(s) initialization started...", self.step_n, message="Cross validation")
         if pipe_dict is None:
             pipe_dict = {}
             if self.run_stacked:
@@ -201,17 +202,17 @@ class VBHelper:
                     initialized = True
             model_dict[key] = pipe
         self.model_dict = model_dict
-        self.logger.log("Model(s) initialization complete.", self.step_n)
+        self.logger.log("Model(s) initialization complete.", self.step_n, message="Cross validation")
         return self.model_dict
 
     def fitEstimators(self):
-        self.logger.log("Estimator(s) fitting started...", self.step_n)
+        self.logger.log("Estimator(s) fitting started...", self.step_n, message="Cross validation")
         for key, model in self.model_dict.items():
             self.model_dict[key].fit(self.X_df, self.y_df)
-        self.logger.log("Estimator(s) fitting complete.", self.step_n)
+        self.logger.log("Estimator(s) fitting complete.", self.step_n, message="Cross validation")
 
     def runCrossValidate(self, verbose=False):
-        self.logger.log("Cross-validate started...", self.step_n)
+        self.logger.log("Cross-validate started...", self.step_n, message="Cross validation")
         n_jobs = self.cv_n_jobs
         if verbose:
             logger.info("CV N-JOBS: {}".format(n_jobs))
@@ -247,7 +248,7 @@ class VBHelper:
             if verbose:
                 logger.info("CV Results: {}".format(cv_results))
         self.cv_results = cv_results
-        self.logger.log("Cross-validate complete.", self.step_n)
+        self.logger.log("Cross-validate complete.", self.step_n, message="Cross validation")
 
     def getCV(self, cv_dict=None):
         if cv_dict is None:
@@ -266,7 +267,7 @@ class VBHelper:
                 random_state=self.rs, groupcount=cv_groupcount, strategy=cv_strategy)
 
     def predictCVYhat(self, ):
-        self.logger.log("Predicting Y-Hat values...", self.step_n)
+        self.logger.log("Predicting Y-Hat values...", self.step_n, message="Cross validation")
         cv_reps = self.project_CV_dict['cv_reps']
         cv_folds = self.project_CV_dict['cv_folds']
         train_idx_list, test_idx_list = zip(*list(self.getCV().split(self.X_df, self.y_df)))
@@ -297,7 +298,7 @@ class VBHelper:
         self.cv_yhat_dict = yhat_dict
         self.cv_y_yhat_dict = cv_y_yhat_dict
         self.cv_err_dict = err_dict
-        self.logger.log("Predicting Y-Hat values complete.", self.step_n)
+        self.logger.log("Predicting Y-Hat values complete.", self.step_n, message="Cross validation")
 
     def evaluate(self):
         full_results = self.arrayDictToListDict(
@@ -326,7 +327,7 @@ class VBHelper:
         return list_dict
 
     def buildCVScoreDict(self):
-        self.logger.log("Building CV Score Dict.", self.step_n)
+        self.logger.log("Building CV Score Dict.", self.step_n, message="Cross validation")
         if self.cv_yhat_dict is None:
             self.predictCVYhat()
         cv_results = self.cv_results
@@ -346,38 +347,86 @@ class VBHelper:
             cv_score_dict_means[pipe_name] = model_idx_mean_scores
         self.cv_score_dict_means = cv_score_dict_means
         self.cv_score_dict = cv_score_dict
-        self.logger.log("Building CV Score Dict complete.", self.step_n)
+        self.logger.log("Building CV Score Dict complete.", self.step_n, message="Cross validation")
 
     def refitPredictiveModels(self, selected_models: dict, verbose: bool=False):
-        # TODO: Add different process for each possible predictive_model_type
         self.logger = VBLogger(self.id)
-        self.logger.log("Refitting specified models for prediction...", 4)
+        self.logger.log("Refitting specified models for prediction...", 4, message="Model selection")
 
-        X_df = self.X_df if self.X_test is None else self.X_test
-        y_df = self.y_df if self.y_test is None else self.y_test
+        X_df = self.X_df
+        y_df = self.y_df
 
         predictive_models = {}
         for name, indx in selected_models.items():
-            logger.info(f"Name: {name}, Index: {indx}")
+            # logger.info(f"Name: {name}, Index: {indx}")
             if name in self.cv_results.keys():
-                predictive_models[f"{name}-{indx}"] = copy.copy(self.cv_results[name]["estimator"][0])
-        logger.info(f"Models:{predictive_models}")
+                predictive_models[f"{name}"] = copy.copy(self.cv_results[name]["estimator"][0])
+        # logger.info(f"Models:{predictive_models}")
         for name, est in predictive_models.items():
             predictive_models[name] = est.fit(X_df, y_df)
         self.predictive_models = predictive_models
-        self.logger.log("Refitting model for prediction complete.", 4)
+        self.logger.log("Refitting model for prediction complete.", 4, message="Model selection")
 
     def predict(self, x_df: pd.DataFrame):
         results = {}
         for name, est in self.predictive_models.items():
             results[name] = est.predict(x_df)
+        n = 0
+        value = 0
+        if self.predictive_model_type == "average":
+            for name, p in results.items():
+                value += p
+                n += 1
+            results["avg"] = value/n
+        elif self.predictive_model_type == "cv-weighted":
+            labels = self.predictive_models.keys()
+            totals = {
+                "neg_mean_squared_error": 0,
+                "neg_mean_absolute_error": 0,
+                "r2": 0
+            }
+            value = {
+                "neg_mean_squared_error": 0,
+                "neg_mean_absolute_error": 0,
+                "r2": 0
+            }
+            for name, p in self.cv_score_dict_means.items():
+                if name in labels:
+                    totals["neg_mean_squared_error"] += abs(p["neg_mean_squared_error"])
+                    totals["neg_mean_absolute_error"] += abs(p["neg_mean_absolute_error"])
+                    totals["r2"] += abs(p["r2"])
+            weights = {}
+            for name, p in results.items():
+                label = name.split("-")
+                label = f"{label[0]}-{label[1]}"
+                weights[name] = {}
+                for scorer, score in self.cv_score_dict_means[label].items():
+                    logger.warning(f"Scorer: {scorer}, Score: {score}")
+                    w = abs(score) / totals[scorer]
+                    weights[name][scorer] = w
+                    value[scorer] += w * p
+            results["weights"] = weights
+            results["cv-avg"] = value
+        results["final-test-predictions"] = self.get_test_predictions()
         return results
 
-    def save(self, n=None, model_id=None):
+    def get_test_predictions(self):
+        test_results = {}
+        if self.X_test is None:
+            return test_results
+        for name, est in self.predictive_models.items():
+            r = {
+                "y": self.y_test.to_list(),
+                "yhat": est.predict(self.X_test)
+            }
+            test_results[name] = r
+        return test_results
+
+    def save(self, n=None, model_id=None, message=None):
         n = self.step_n if n is None else n
         self.logger.log("Saving results...", n)
         m = save_model(self, model_id=model_id, pipeline_id=self.id)
         if m:
-            self.logger.log("Saving results complete", n)
+            self.logger.log("Saving results complete", n, message=message)
         else:
             self.logger.log("Unable to save results", n, error=True)

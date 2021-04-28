@@ -297,7 +297,7 @@ class PipelineView(viewsets.ViewSet):
             p_models = {}
             for p in json.loads(input_data["predictive_models"]):
                 p_models[p[0]] = int(p[1])
-            m = Metadata(model, json.dumps({"predictive_models": p_models}))
+            m = Metadata(model, json.dumps({"predictive_models": p_models, "predictive_model_type": input_data["predictive_model_type"]}))
             meta = m.set_metadata("ModelMetadata")
 
             response = {}
