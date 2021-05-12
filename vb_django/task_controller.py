@@ -33,7 +33,7 @@ pipelines = {
     "flexpipe": FlexiblePipe,
     "l1lars": L1Lars,
     "lrsup": LinRegSupreme,
-    "sbfsvr": RBFSVR,
+    "rbfsvr": RBFSVR,
     "linsvr": LinSVR,
 }
 
