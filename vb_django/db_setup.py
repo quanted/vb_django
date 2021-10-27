@@ -16,13 +16,19 @@ def load_pipelines(purge: bool = False):
     print("Setting up and loading pipeline instance hyper-parameters and metadata")
     for name, p in pl.items():
         try:
-            pipeline = PipelineInstance.objects.get(ptype=name)
-            pipeline.description = p.description
-            pipeline.name = p.name
-            pipeline.active = True
-        except PipelineInstance.DoesNotExist:
-            pipeline = PipelineInstance(name=p.name, ptype=p.ptype, description=p.description, active=True)
-        except Exception:
+            pipeline = PipelineInstance.objects.filter(ptype=name)
+            if len(pipeline) > 1:
+                for p in pipeline:
+                    p.delete()
+                pipeline = PipelineInstance(name=p.name, ptype=p.ptype, description=p.description, active=True)
+            elif len(pipeline) == 0:
+                pipeline = PipelineInstance(name=p.name, ptype=p.ptype, description=p.description, active=True)
+            else:
+                pipeline = pipeline[0]
+                pipeline.description = p.description
+                pipeline.name = p.name
+                pipeline.active = True
+        except Exception as e:
             print("Stopped loading pipelines due to db connection issue")
             logger.info("Stopped loading pipelines due to db connection issue")
             return

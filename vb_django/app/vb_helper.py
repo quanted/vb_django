@@ -3,6 +3,7 @@ from sklearn.metrics import get_scorer
 from sklearn.model_selection import cross_validate, train_test_split, RepeatedKFold
 from vb_django.app.base_helper import MultiPipe, FCombo, NullModel
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
+from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.utilities import update_status, save_model, update_pipeline_metadata
 import pandas as pd
 import logging
@@ -43,6 +44,11 @@ class VBHelper:
     ptype = "vbhelper"
     description = "Parent pipeline class, containing global CV"
     hyper_parameters = {
+        "drop_duplicates": {
+            "type": "bool",
+            "options": "True,False",
+            "value": False
+        },
         "test_share": {
             "type": "float",
             "options": "0.0, 1.0",
@@ -77,32 +83,56 @@ class VBHelper:
             "type": "bool",
             "options": "True,False",
             "value": True
+        },
+        "nan_threshold": {
+            "type": "float",
+            "options": "0.0, 1.0",
+            "value": 0.99
+        },
+        "shuffle": {
+            "type": "bool",
+            "options": "True,False",
+            "value": True
+        },
+        "predict_n": {
+            "type": "int",
+            "options": "1:n/3",
+            "value": 3
         }
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, test_share=0.2, cv_folds=5, cv_reps=2, random_state=0, cv_strategy=None, run_stacked='True',
-                 cv_n_jobs=4):
+    def __init__(self, pipeline_id, test_share=0.2, cv_folds=5, cv_reps=2, random_state=0, cv_strategy=None, run_stacked=True,
+                 cv_n_jobs=4, drop_duplicates=False, nan_threshold=0.99, shuffle=True, predict_n=3):
         self.id = pipeline_id
         self.logger = VBLogger(self.id)
         self.step_n = 16
         self.logger.log("Initializating global input parameters.", self.step_n, message="Cross validation")
         self.cv_n_jobs = cv_n_jobs
         self.cv_strategy = cv_strategy
-        self.run_stacked = run_stacked == 'True'
+        self.run_stacked = run_stacked
         self.test_share = test_share
         self.rs = random_state
+        self.drop_duplicates = drop_duplicates
+        self.nan_threshold = nan_threshold
+        self.shuffle = shuffle
+        self.predict_n = predict_n
+        self.predict_idx = None
 
+        self.dep_var_name = None
         self.scorer_list = ['neg_mean_squared_error', 'neg_mean_absolute_error', 'r2']
         self.max_k = None
         self.estimator_dict = {}
         self.model_dict = {}
+        self.original_pipe_dict = None
 
         self.project_CV_dict = {}
         self.X_df = None
         self.y_df = None
         self.X_test = None
         self.y_test = None
+        self.X_predict = None
+        self.y_predict = None
         self.cat_idx, self.cat_vars = None, None
         self.float_idx = None
         self.cv_results = None
@@ -134,6 +164,14 @@ class VBHelper:
 
     def setData(self, X_df, y_df):
         self.logger.log("Input data setup started...", self.step_n, message="Cross validation")
+        self.dep_var_name = y_df.columns.to_list()[0]
+        X_df, y_df = self.checkData(X_df, y_df)
+        predict_select = np.random.choice(np.arange(y_df.shape[0]), size=self.predict_n, replace=False)
+        self.predict_idx = predict_select
+        self.X_predict = X_df.iloc[predict_select]
+        X_df.drop(index=predict_select, inplace=True)
+        self.y_predict = y_df.iloc[predict_select]
+        y_df.drop(index=predict_select, inplace=True)
 
         # Data shuffling
         shuf = np.arange(y_df.shape[0])
@@ -150,27 +188,77 @@ class VBHelper:
             self.y_df = y_df
             self.X_test = None
             self.y_test = None
-        try:
-            self.cat_idx, self.cat_vars = zip(*[(i, var) for i, (var, dtype) in enumerate(dict(X_df.dtypes).items()) if dtype == 'object'])
-        except ValueError as e:
-            # No categorical variables
+        if 'object' in list(dict(X_df.dtypes).values()):
+            self.cat_idx, self.cat_vars = zip(
+                *[(i, var) for i, (var, dtype) in enumerate(dict(X_df.dtypes).items()) if dtype == 'object'])
+        else:
             self.cat_idx = []
             self.cat_vars = []
         self.float_idx = [i for i in range(X_df.shape[1]) if i not in self.cat_idx]
         self.logger.log("Input data setup complete.", self.step_n, message="Cross validation")
 
+    def checkData(self, X_df, y_df):
+        X_dtype_dict = dict(X_df.dtypes)
+        for var, dtype in X_dtype_dict.items():
+            if str(dtype)[:3] == 'int':
+                X_df.loc[:, var] = X_df.loc[:, var].astype('float')
+        data_df = X_df.copy()
+        data_df.loc['dependent_variable', :] = y_df.loc[:, self.dep_var_name]
+        X_duplicates = X_df.duplicated()
+        full_duplicates = data_df.duplicated()
+        full_dup_sum = full_duplicates.sum()
+        X_dup_sum = X_duplicates.sum()
+        logger.info(f"Pipeline ID: {self.id} - Check Data - # of duplicate rows of data: {full_dup_sum}, # of duplicates rows of X: {X_dup_sum}")
+
+        if self.drop_duplicates:
+            if self.drop_duplicates.lower() in ['yx', 'xy', 'full']:
+                X_df = X_df[~full_duplicates]
+                logger.info(f"Pipeline ID: {self.id} - Check Data - # of duplicate Xy rows dropped: {full_dup_sum}")
+            elif self.drop_duplicates.lower() == 'x':
+                X_df = X_df[~X_duplicates]
+                logger.info(f"Pipeline ID: {self.id} - Check Data - # of duplicate X rows dropped: {X_dup_sum}")
+            else:
+                assert False, 'unexpected drop_duplicates:{self.drop_duplicates}'
+
+        drop_cols = X_df.columns[X_df.isnull().sum(axis=0) / X_df.shape[0] > self.nan_threshold]
+        if len(drop_cols) > 0:
+            logger.info(f"Pipeline ID: {self.id} - Check Data - columns to drop: {drop_cols}")
+            X_df.drop(drop_cols, axis=1, inplace=True)
+
+        return X_df, y_df
+
+    @staticmethod
+    def saveFullFloatXy(X_df, y_df):
+        mvh = MissingValHandler({
+            'impute_strategy': 'impute_knn5'  # 'pass-through'
+        })
+        mvh = mvh.fit(X_df)
+        X_float = mvh.transform(X_df)
+        X_float_df = pd.DataFrame(data=X_float,
+                                  columns=mvh.get_feature_names(input_features=X_df.columns.to_list()))
+        X_json_s = X_float_df.to_json()  # _json_s is json-string
+        y_json_s = y_df.to_json()
+        X_nan_bool_s = X_df.isnull().to_json()
+
+        summary_data = {'full_float_X': X_json_s, 'full_y': y_json_s, 'X_nan_bool': X_nan_bool_s}
+        return summary_data
+
     def setPipeDict(self, pipe_dict):
         self.logger.log("Estimator(s) setup started...", self.step_n, message="Cross validation")
+        self.original_pipe_dict = pipe_dict
         if self.run_stacked:
             # logger.info("Running stacked pipeline")
-            self.estimator_dict = {'multi_pipe': {'pipe': MultiPipe, 'pipe_kwargs': {
-                'pipelist': list(pipe_dict.items())}}}  # list...items() creates a list of tuples...
+            self.estimator_dict = {'stacking_reg': {'pipe': MultiPipe, 'pipe_kwargs': {'pipelist': list(pipe_dict.items())}}}
         else:
             self.estimator_dict = pipe_dict
         self.logger.log("Estimator(s) setup complete.", self.step_n, message="Cross validation")
 
     def setModelDict(self, pipe_dict=None):
         self.logger.log("Model(s) initialization started...", self.step_n, message="Cross validation")
+        # if pipe_dict is None:
+        #     self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in self.estimator_dict.items()}
+        # else:
+        #     self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in pipe_dict.items()}
         if pipe_dict is None:
             pipe_dict = {}
             if self.run_stacked:
@@ -220,16 +308,16 @@ class VBHelper:
         cv_results = {}
         new_cv_results = {}
         cv = self.getCV()
-        for estimator_name, model in self.model_dict.items():
+        for pipe_name, model in self.model_dict.items():
             start = time.time()
             model_i = cross_validate(
-                model, self.X_df, self.y_df, return_estimator=True,
-                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, error_score='raise')
+                model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
+                scoring=self.scorer_list, cv=self.getCV(), n_jobs=n_jobs)
             end = time.time()
             if verbose:
-                logger.info(f"SCORES - {estimator_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")
-                logger.info(f"MODELS - {estimator_name},{model_i}")
-            cv_results[estimator_name] = model_i
+                logger.info(f"SCORES - {pipe_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")
+                logger.info(f"MODELS - {pipe_name},{model_i}")
+            cv_results[pipe_name] = model_i
         if self.run_stacked:
             for est_name, result in cv_results.items():
                 if type(result['estimator'][0]) is MultiPipe:
@@ -258,8 +346,7 @@ class VBHelper:
         cv_folds = cv_dict['cv_folds']
         cv_strategy = cv_dict['cv_strategy']
         if cv_strategy is None:
-            return RepeatedKFold(
-                n_splits=cv_folds, n_repeats=cv_reps, random_state=self.rs)
+            return RepeatedKFold(n_splits=cv_folds, n_repeats=cv_reps, random_state=self.rs)
         else:
             assert type(cv_strategy) is tuple, f'expecting tuple for cv_strategy, got {cv_strategy}'
             cv_strategy, cv_groupcount = cv_strategy
@@ -273,7 +360,7 @@ class VBHelper:
         cv_folds = self.project_CV_dict['cv_folds']
         train_idx_list, test_idx_list = zip(*list(self.getCV().split(self.X_df, self.y_df)))
         n, k = self.X_df.shape
-        y = self.y_df.to_numpy()
+        y = self.y_df.to_numpy()[:, 0]
         data_idx = np.arange(n)
         yhat_dict = {}
         err_dict = {}
@@ -360,8 +447,13 @@ class VBHelper:
         prediction_models = {}
         for name, indx in selected_models.items():
             # logger.info(f"Name: {name}, Index: {indx}")
-            if name in self.cv_results.keys():
-                prediction_models[f"{name}"] = copy.copy(self.cv_results[name]["estimator"][0])
+            try:
+                prediction_models[name] = self.model_dict[name]#copy.copy(self.cv_results[name]["estimator"][indx])
+            except KeyError:
+                pipe_i = self.original_pipe_dict[name]
+                prediction_models[name] = pipe_i['pipe'](**pipe_i['pipe_kwargs'])
+            # if name in self.cv_results.keys():
+            #     prediction_models[f"{name}"] = copy.copy(self.cv_results[name]["estimator"][0])
         for name, est in prediction_models.items():
             prediction_models[name] = est.fit(X_df, y_df)
         self.prediction_models = prediction_models
@@ -376,8 +468,14 @@ class VBHelper:
                     scorer: 1 / model_count for scorer in self.scorer_list
                 } for i in range(model_count)
             }
+            return
         elif self.prediction_model_type == "cv-weighted":
             totals = {
+                "neg_mean_squared_error": 0,
+                "neg_mean_absolute_error": 0,
+                "r2": 0
+            }
+            value = {
                 "neg_mean_squared_error": 0,
                 "neg_mean_absolute_error": 0,
                 "r2": 0
@@ -391,12 +489,12 @@ class VBHelper:
             for pipe_name in pipe_names:
                 weights[pipe_name] = {}
                 for scorer, score in self.cv_score_dict_means[pipe_name].items():
-                    logger.warning(f"Scorer: {scorer}, Score: {score}, Total:{totals[scorer]}")
+                    # logger.warning(f"Scorer: {scorer}, Score: {score}")
                     if "neg" == scorer[:3]:
                         w = (1 / (abs(score))) / totals[scorer]
                     elif scorer == "r2":
                         score = score if score > 0 else 0
-                        w = score / totals[scorer] if totals[scorer] != 0 else 0
+                        w = score / totals[scorer]
                     else:
                         w = abs(score) / totals[scorer]
                     weights[pipe_name][scorer] = w
@@ -412,17 +510,55 @@ class VBHelper:
         }
         return collection
 
-    def predict(self, x_df: pd.DataFrame):
-        if self.prediction_model_type == "average" or self.prediction_model_type == "cv-weighted":
+    def predictandSave(self, X_predict=None, scorer=None):
+        if scorer is None:
+            scorer = self.scorer_list[0]
+        if X_predict is None:
+            X_predict = self.X_predict
+        if not str(X_predict.index.to_list()[0])[:7].lower() == 'predict':
+            X_predict.index = [f'predict-{idx}' for idx in X_predict.index]
+        yhat = self.predict(X_predict)
+        yhat_cv = self.predict(X_predict, model_type='cross_validation')
+
+        predictresult = {
+            'yhat': yhat['prediction'][scorer].to_json(),
+            'cv_yhat': [yhat_cv_by_scorer[scorer].to_json() for yhat_cv_by_scorer in yhat_cv['prediction']],
+            'X_predict': X_predict.to_json(),
+            'selected_models': [*self.prediction_models]}
+        return predictresult
+
+    def predict(self, X_df_predict: pd.DataFrame, model_type: str = 'predictive'):
+        if self.model_averaging_weights is None:
             self.setModelAveragingWeights()
         results = {}
-        wtd_yhats = {scorer: np.zeros(x_df.shape[0]) for scorer in self.scorer_list}
+
+        if model_type == 'cross_validation':
+            wtd_yhats = [{scorer: np.zeros(X_df_predict.shape[0]) for scorer in self.scorer_list} for _ in
+                         range(self.project_CV_dict['cv_count'])]
+        else:
+            wtd_yhats = {scorer: np.zeros(X_df_predict.shape[0]) for scorer in self.scorer_list}
         for name, est in self.prediction_models.items():
-            results[name] = est.predict(x_df)
-            for scorer, weights in self.model_averaging_weights[name].items():
-                wtd_yhats[scorer] += weights * results[name]
+            if model_type == 'predictive':
+                results[name] = est.predict(X_df_predict)
+                for scorer, weights in self.model_averaging_weights[name].items():
+                    wtd_yhats[scorer] += weights * results[name]
+            elif model_type == 'cross_validation':
+                results[name] = []
+                for cv_i in range(self.project_CV_dict['cv_count']):
+                    model_cv_i = self.cv_results[name]['estimator'][cv_i]
+                    results[name].append(model_cv_i.predict(X_df_predict))
+                    for scorer, weights in self.model_averaging_weights[name].items():
+                        wtd_yhats[cv_i][scorer] += weights * results[name][cv_i]
+        wtd_yhats_dfs = {}
+        if model_type == 'predictive':
+            wtd_yhats_dfs = {scorer: pd.DataFrame(data=arr[:, None], index=X_df_predict.index, columns=['yhat']) for
+                             scorer, arr in wtd_yhats.items()}
+        elif model_type == 'cross_validation':
+            wtd_yhats_dfs = [
+                {scorer: pd.DataFrame(data=arr[:, None], index=X_df_predict.index, columns=['yhat']) for scorer, arr in
+                 cv_dict.items()} for cv_dict in wtd_yhats]
         results["weights"] = self.model_averaging_weights
-        results["prediction"] = wtd_yhats
+        results["prediction"] = wtd_yhats_dfs
         return results
 
     def get_test_predictions(self):

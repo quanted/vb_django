@@ -1,8 +1,9 @@
-from vb_django.models import Pipeline, Dataset, Model, PipelineInstance, PipelineInstanceMetadata
+from vb_django.models import Pipeline, Dataset, Model, PipelineInstance, PipelineInstanceMetadata, PipelineLog
 from vb_django.app.metadata import Metadata
 import json
 import logging
 import zlib
+import datetime
 import pandas as pd
 from io import StringIO
 import pickle
@@ -25,6 +26,7 @@ def update_status(_id, status, stage, message=None, retry=5, log=None):
         m.set_metadata(meta)
         if log:
             logger.info(log)
+        PipelineLog(pipeline=amodel, logtype=status, log=f"Stage: {stage}, Message: {message}", timestamp=str(datetime.datetime.now().timestamp()))
     except Exception as ex:
         logger.warning("Error attempting to save status update: {}".format(ex))
         update_status(_id, status, stage, None, retry - 1)

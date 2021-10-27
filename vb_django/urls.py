@@ -56,8 +56,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # ----------- Swagger Docs/UI ------------- #
-    re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    re_path(r'^openapi(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    re_path(r'^openapi/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
 
     # ---------- User API endpoints ----------- #
     path('api/user/login/', UserLoginView.as_view()),                           # POST - Login

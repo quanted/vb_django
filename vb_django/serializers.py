@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from vb_django.models import Project, ProjectMetadata, Dataset, DatasetMetadata, Pipeline, Location, \
     LocationMetadata, PipelineMetadata, Model, ModelMetadata, AccessControlList, PipelineInstance, \
-    PipelineInstanceParameters, PipelineInstanceMetadata
+    PipelineInstanceParameters, PipelineInstanceMetadata, PipelineLog
 from vb_django.utilities import save_dataset, load_dataset
 
 
@@ -160,6 +160,19 @@ class PipelineMetadataSerializer(serializers.ModelSerializer):
         model = PipelineMetadata
         fields = [
             "id", "parent", "name", "value"
+        ]
+
+
+class PipelineLogSerializer(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        plog = PipelineLog(**validated_data)
+        plog.save()
+
+    class Meta:
+        model = PipelineLog
+        fields = [
+            "id", "pipeline", "logtype", "log", "timestamp"
         ]
 
 

@@ -9,6 +9,9 @@ from vb_django.serializers import PipelineSerializer
 from vb_django.permissions import IsOwnerOfPipeline, IsOwnerOfProject, IsOwnerOfDataset, IsOwnerOfModel
 from vb_django.task_controller import DaskTasks
 from vb_django.utilities import load_request
+from vb_django.prediction_data import PredictionData
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 import logging
 import json
 
@@ -23,6 +26,16 @@ class PipelineView(viewsets.ViewSet):
     serializer_class = PipelineSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated, IsOwnerOfPipeline]
+
+    dataset_id_p = openapi.Parameter('dataset_id', openapi.IN_BODY, description="Dataset ID (required)", type=openapi.TYPE_STRING)
+    project_id_p = openapi.Parameter('project_id', openapi.IN_BODY, description="Project ID (required)", type=openapi.TYPE_STRING)
+    pipeline_id_p = openapi.Parameter('pipeline_id', openapi.IN_BODY, description="Pipeline ID (required)", type=openapi.TYPE_STRING)
+    model_id_p = openapi.Parameter('model_id', openapi.IN_BODY, description="Model ID (required)", type=openapi.TYPE_STRING)
+    dataset_id_q = openapi.Parameter('dataset_id', openapi.IN_QUERY, description="Dataset ID (required)", type=openapi.TYPE_STRING)
+    project_id_q = openapi.Parameter('project_id', openapi.IN_QUERY, description="Project ID (required)", type=openapi.TYPE_STRING)
+    pipeline_id_q = openapi.Parameter('pipeline_id', openapi.IN_QUERY, description="Pipeline ID (required)", type=openapi.TYPE_STRING)
+    model_id_q = openapi.Parameter('model_id', openapi.IN_QUERY, description="Model ID (required)", type=openapi.TYPE_STRING)
+
 
     def list(self, request):
         """
@@ -44,6 +57,7 @@ class PipelineView(viewsets.ViewSet):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    @swagger_auto_schema(request_body=PipelineSerializer)
     def create(self, request):
         """
         POST request that creates a new Pipeline.
@@ -71,7 +85,14 @@ class PipelineView(viewsets.ViewSet):
                 return Response(pipeline, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @swagger_auto_schema(request_body=PipelineSerializer)
     def update(self, request, pk=None):
+        """
+
+        :param request:
+        :param pk:
+        :return:
+        """
         pipeline_inputs = load_request(request)
         serializer = self.serializer_class(data=pipeline_inputs, context={'request': request})
 
@@ -109,6 +130,12 @@ class PipelineView(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
+        """
+
+        :param request:
+        :param pk:
+        :return:
+        """
         if pk is not None:
             try:
                 amodel = Pipeline.objects.get(id=int(pk))
@@ -121,8 +148,14 @@ class PipelineView(viewsets.ViewSet):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
         return Response("No pipeline 'id' in request.", status=status.HTTP_400_BAD_REQUEST)
 
+    # @swagger_auto_schema(manual_parameters=[project_id_p, dataset_id_p, pipeline_id_p])
     @action(detail=False, methods=["post"], name="Execute a pipeline")
     def execute(self, request):
+        """
+
+        :param request:
+        :return:
+        """
         input_data = load_request(request)
         required_parameters = ["project_id", "dataset_id", "pipeline_id"]
         if set(required_parameters).issubset(input_data.keys()):
@@ -169,8 +202,14 @@ class PipelineView(viewsets.ViewSet):
                 status.HTTP_400_BAD_REQUEST
             )
 
+    @swagger_auto_schema(manual_parameters=[project_id_q, pipeline_id_q])
     @action(detail=False, methods=["GET"], name="Get the status of an executed pipeline.")
     def status(self, request):
+        """
+
+        :param request:
+        :return:
+        """
         input_data = self.request.query_params
         required_parameters = ["project_id", "pipeline_id"]
         if set(required_parameters).issubset(input_data.keys()):
@@ -228,8 +267,14 @@ class PipelineView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
+    # @swagger_auto_schema(manual_parameters=[project_id_p, model_id_p])
     @action(detail=False, methods=["POST"], name="Evaluate a fitted model")
     def evaluate(self, request):
+        """
+
+        :param request:
+        :return:
+        """
         input_data = load_request(request)
         required_parameters = ["project_id", "model_id"]
         if set(required_parameters).issubset(input_data.keys()):
@@ -267,8 +312,14 @@ class PipelineView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
+    # @swagger_auto_schema(manual_parameters=[project_id_p, model_id_p])
     @action(detail=False, methods=["POST"], name="Refitting model(s) for prediction")
     def refit_model(self, request):
+        """
+
+        :param request:
+        :return:
+        """
         input_data = load_request(request)
         required_parameters = ["project_id", "model_id", "prediction_models", "prediction_model_type"]
         if set(required_parameters).issubset(input_data.keys()):
@@ -313,6 +364,7 @@ class PipelineView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
+    # @swagger_auto_schema(manual_parameters=[project_id_p, model_id_p])
     @action(detail=False, methods=["POST"], name="Make a prediction with a completed pipeline's model.")
     def predict(self, request):
         input_data = load_request(request)
@@ -351,6 +403,46 @@ class PipelineView(viewsets.ViewSet):
             response["dataset_id"] = project.dataset
             response["results"] = results
             return Response(response, status=status.HTTP_200_OK)
+        data = "Missing required parameters: {}".format(", ".join(required_parameters))
+        response_status = status.HTTP_200_OK
+        return Response(data, status=response_status)
+
+    @swagger_auto_schema(manual_parameters=[project_id_q, model_id_q])
+    @action(detail=False, methods=["GET"], name="Make prediction with set assigned data from the dataset.")
+    def predict_and_save(self, request):
+        """
+
+        :param request:
+        :return:
+        """
+        input_data = load_request(request)
+        required_parameters = ["project_id", "model_id"]
+        if set(required_parameters).issubset(input_data.keys()):
+            permissions = []
+            try:
+                project = Project.objects.get(id=int(input_data["project_id"]))
+                if not IsOwnerOfProject().has_object_permission(request, self, project):
+                    permissions.append("Unauthorized to access project.")
+            except Project.DoesNotExist:
+                project = None
+            try:
+                model = Model.objects.get(id=int(input_data["model_id"]))
+                if not IsOwnerOfModel().has_object_permission(request, self, model):
+                    permissions.append("Unauthorized to access pipeline")
+            except Model.DoesNotExist:
+                model = None
+            if len(permissions) > 0:
+                return Response(permissions, status=status.HTTP_401_UNAUTHORIZED)
+            if model is None or project is None:
+                message = []
+                if project is None:
+                    message.append("No project found for id: {}".format(input_data["project_id"]))
+                if model is None:
+                    message.append("No model found for id: {}".format(input_data["model_id"]))
+                return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            pd = PredictionData(project_id=project.id, model_id=model.id)
+            data = pd.get_cv_predictions()
+            return Response(data, status=status.HTTP_200_OK)
         data = "Missing required parameters: {}".format(", ".join(required_parameters))
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)

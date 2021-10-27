@@ -7,6 +7,7 @@ from vb_django.serializers import LocationSerializer
 from vb_django.permissions import IsOwnerOfProject
 from vb_django.app.metadata import Metadata
 from vb_django.utilities import load_request
+from drf_yasg.utils import swagger_auto_schema
 
 
 class LocationView(viewsets.ViewSet):
@@ -33,6 +34,7 @@ class LocationView(viewsets.ViewSet):
             l["metadata"] = m.get_metadata("LocationMetadata")
         return Response(response_data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(request_body=LocationSerializer)
     def create(self, request):
         """
         POST request that creates a new location.
@@ -55,6 +57,7 @@ class LocationView(viewsets.ViewSet):
                 return Response(location_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @swagger_auto_schema(request_body=LocationSerializer)
     def update(self, request, pk=None):
         """
         PUT request to update an existing location.

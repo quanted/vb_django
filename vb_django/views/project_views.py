@@ -7,6 +7,7 @@ from vb_django.serializers import ProjectSerializer
 from vb_django.permissions import IsOwner
 from vb_django.app.metadata import Metadata
 from vb_django.utilities import load_request
+from drf_yasg.utils import swagger_auto_schema
 
 
 class ProjectView(viewsets.ViewSet):
@@ -34,6 +35,7 @@ class ProjectView(viewsets.ViewSet):
             d["metadata"] = meta
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(request_body=ProjectSerializer)
     def create(self, request):
         """
         POST request that creates a new project.
@@ -54,6 +56,7 @@ class ProjectView(viewsets.ViewSet):
             return Response(project, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @swagger_auto_schema(request_body=ProjectSerializer)
     def update(self, request, pk=None):
         """
         PUT request for updating a project.

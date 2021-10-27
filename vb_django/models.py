@@ -55,6 +55,13 @@ class PipelineMetadata(models.Model):
     value = models.CharField(max_length=1024)
 
 
+class PipelineLog(models.Model):
+    parent = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+    logtype = models.CharField(max_length=24)
+    log = models.CharField(max_length=512)
+    timestamp = models.CharField(max_length=56)
+
+
 class Model(models.Model):
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
     name = models.CharField(max_length=128)

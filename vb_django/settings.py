@@ -23,6 +23,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'cdu1aqcu#bw)$d39*r602h@zg1a7()&c(r39y#s5tt6oqq!3je'
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
