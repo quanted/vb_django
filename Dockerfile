@@ -11,7 +11,7 @@ RUN mkdir -p /opt/app
 
 COPY requirements.txt /opt/app/requirements.txt
 RUN pip install -r /opt/app/requirements.txt
-RUN pip install uwsgi==2.0.19.1
+RUN pip install uwsgi
 
 COPY vb_django/uwsgi.ini /etc/uwsgi/
 COPY start-server.sh /tmp/start-django-server.sh
