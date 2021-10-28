@@ -169,3 +169,4 @@ REST_FRAMEWORK = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+LOGIN_URL = "/api/user/login/"
