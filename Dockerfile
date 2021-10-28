@@ -1,4 +1,4 @@
-FROM python:3.8.2-slim
+FROM python:3.9.7-slim
 
 ARG APP_USER=appuser
 RUN groupadd -r ${APP_USER} && useradd --no-log-init -r -g ${APP_USER} ${APP_USER}
