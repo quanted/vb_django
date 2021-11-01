@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from scipy.stats import spearmanr, pearsonr, gaussian_kde
 from scipy.cluster import hierarchy
@@ -15,8 +15,8 @@ class VBSummary:
         self.full_X_float_df = None
         self.full_y_df = None
         self.X_nan_bool_df = None
-        self.spear_xy = None
-        self.r_list = None
+        self.spear_xy = []
+        self.r_list = []
 
     def setData(self, df_dict):
         self.full_X_float_df = pd.read_json(df_dict['full_float_X'])
@@ -50,17 +50,10 @@ class VBSummary:
         return data
 
     def getTopNCols(self, n_cols, keep_cats=True):
-
-        try:
-            self.spear_xy, self.r_list
-        except:
-            self.spear_xy = []
-            self.r_list = []
-
-            for col in self.full_X_float_df.columns:
-                r = spearmanr(self.full_y_df, self.full_X_float_df[col]).correlation
-                self.spear_xy.append((r, col))
-                self.r_list.append(r)
+        for col in self.full_X_float_df.columns:
+            r = spearmanr(self.full_y_df, self.full_X_float_df[col]).correlation
+            self.spear_xy.append((r, col))
+            self.r_list.append(r)
         if keep_cats:
             r_arr = np.array(self.r_list)
         else:
@@ -73,10 +66,7 @@ class VBSummary:
         return keep_cols
 
     def kernelDensityPie(self):
-        try:
-            self.spear_xy, self.r_list
-        except:
-            _ = self.getTopNCols(1)
+        _ = self.getTopNCols(1)
         spear_xy_indexed = [
             (np.abs(tup[0]), tup[1], i)
             for i, tup in enumerate(self.spear_xy)]
@@ -102,20 +92,33 @@ class VBSummary:
         plot_cols = int(total_var_count ** 0.5)
         plot_rows = -(-total_var_count // plot_cols)  # ceiling divide
         data = {
-            "float_vars": float_vars, "cat_vars": cat_vars, "dk": [], "pies": []
+            "float_vars": float_vars, "cat_vars": cat_vars, "dk": {}, "pies": {}
         }
-        for name, idx in enumerate(float_vars):
-            density = gaussian_kde(self.full_X_float_df.loc[:, [name]])
+        _y_data = self.full_y_df.values.flatten()
+        y_density = gaussian_kde(_y_data)
+        y_dp = np.linspace(_y_data.min(), _y_data.max(), num=_y_data.shape[0])
+        y_z = np.reshape(y_density(y_dp).T, _y_data.shape)
+        y_label = self.full_y_df.columns[0]
+        data["target_var"] = y_label
+        data["dk"][y_label] = {"type": "target", "r": "NA", "value": y_z, "positions": y_dp}
+
+        for idx, name in enumerate(float_vars):
+            _x_data = self.full_X_float_df.loc[:, [name]].values
+            _x_data = _x_data.flatten()
+            density = gaussian_kde(_x_data)
+            pos = np.linspace(_x_data.min(), _x_data.max(), num=_x_data.shape[0])
+            z = np.reshape(density(pos).T, _x_data.shape)
             r = round(r_sort[float_idx[idx]], 2)
-            data["dk"].append({"name": name, "r": r, "density": density})
-        for name, idx, in enumerate(cat_var_dict.keys()):
+            data["dk"][name] = ({"type": "variable", "r": r, "value": z, "positions": pos})
+        for idx, name in enumerate(cat_var_dict.keys()):
+            # TODO: Categorical variable pie charts data untested
             cat_flavors, var_names = zip(*cat_var_dict[name])
             cum_r = np.sum(np.abs(np.array([r_sort[cat_idx_list[cat_vars.index(cat)]] for cat in var_names])))
             cat_df = self.full_X_float_df.loc[:, var_names]
             cat_df.columns = cat_flavors
             cat_shares = cat_df.sum()
             r = round(cum_r, 2)
-            data["pies"].append({"name": name, "r": r, "data": cat_shares})
+            data["pies"][name] = ({"type": "variable", "r": r, "data": cat_shares})
         return data
 
     def mergeCatVars(self, var_names):
@@ -132,49 +135,57 @@ class VBSummary:
 
     def missingVals(self):
         n = self.X_nan_bool_df.shape[0]
-        if np.sum(self.X_nan_bool_df.to_numpy().ravel()) == 0:
-            print(f'no missing values found')
-            return
-        data = {"n": n}
+
+        data = {"p1": {}, "p2": {}, "p3": {}, "p4": {}}
         nan_01 = self.X_nan_bool_df.to_numpy().astype(np.int16)
-        data["nan_01"] = nan_01
+
         feature_names = self.X_nan_bool_df.columns.to_list()
-        data["feature_names"] = feature_names
+        data["p1"]["feature_names"] = feature_names
         feature_idx = np.arange(len(feature_names))
-        data["feature_idx"] = feature_idx
 
         feat_miss_count_ser = self.X_nan_bool_df.astype(np.int16).sum(axis=0)
-        data["feat_miss_count_ser"] = feat_miss_count_ser
+        data["p1"]["miss_count"] = feat_miss_count_ser
 
         pct_missing_list = [f'{round(pct)}%' for pct in (100 * feat_miss_count_ser / n).tolist()]
-        data["pct_missing_list"] = pct_missing_list
+        # data["pct_missing_list"] = pct_missing_list
 
-        row_miss_count_ser = feat_miss_count_ser = self.X_nan_bool_df.astype(np.int16).sum(axis=1)
-        data["row_miss_count_ser"] = row_miss_count_ser
+        row_miss_count_ser = self.X_nan_bool_df.astype(np.int16).sum(axis=1)
+        data["p2"]["row_miss_count_ser"] = row_miss_count_ser.to_numpy()
+        data["p2"]["n"] = np.arange(n)
 
         nan_01_sum = nan_01.sum(axis=0)
         has_nan_features = nan_01_sum > 0
         nan_01_hasnan = nan_01[:, has_nan_features]
         hasnan_features = [name for i, name in enumerate(feature_names) if has_nan_features[i]]
-        data["hasnan_features"] = hasnan_features
         nan_corr = self.pearsonCorrelationMatrix(nan_01_hasnan)
-        data["nan_corr"] = nan_corr
         nan_corr_df = pd.DataFrame(data=nan_corr, columns=hasnan_features)
         self.nan_corr = nan_corr
         self.nan_corr_df = nan_corr_df
-        corr_linkage = hierarchy.ward(nan_corr)
-        dendro = hierarchy.dendrogram(  # just used for ordering the features by the grouping
-            corr_linkage, labels=hasnan_features, ax=None, no_plot=True, leaf_rotation=90)
-        data["dendro"] = dendro
+        if nan_corr.shape[0] == 0:
+            corr_linkage = []
+        else:
+            corr_linkage = hierarchy.ward(nan_corr)
+        data["p3"]["feature_names"] = feature_names
+        data["p3"]["feature_idx"] = feature_idx
+        data["p3"]["nan_01"] = nan_01
 
+        labels = ['missing data']
         colors = [plt.get_cmap('plasma')(value) for value in [255]]
         data["colors"] = colors
-        labels = ['missing data']
-        patches = [Patch(color=colors[i], label=labels[i]) for i in [0]]
-        data["patches"] = patches
+        # patches = [Patch(color=colors[i], label=labels[i]) for i in [0]]
+        # data["p3"]["legend"] = patches
+
+        if len(corr_linkage) == 0:
+            data["p4"]["cp"] = []
+            data["p4"]["labels"] = []
+        else:
+            dendro = hierarchy.dendrogram(corr_linkage, labels=hasnan_features, ax=None, no_plot=True, leaf_rotation=90)
+            data["p4"]["cp"] = nan_corr[dendro['leaves'], :][:, dendro['leaves']]
+            data["p4"]["labels"] = dendro["ivl"]
 
         hasnan_feature_idx = np.arange(len(hasnan_features))
-        data["hasnan_feature_idx"] = hasnan_feature_idx
+        data["p4"]["ticks"] = hasnan_feature_idx
+
 
         return data
 

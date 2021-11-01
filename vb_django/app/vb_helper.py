@@ -127,6 +127,8 @@ class VBHelper:
         self.original_pipe_dict = None
 
         self.project_CV_dict = {}
+        self.X_df_start_order = None
+        self.y_df_start_order = None
         self.X_df = None
         self.y_df = None
         self.X_test = None
@@ -166,6 +168,10 @@ class VBHelper:
         self.logger.log("Input data setup started...", self.step_n, message="Cross validation")
         self.dep_var_name = y_df.columns.to_list()[0]
         X_df, y_df = self.checkData(X_df, y_df)
+
+        self.X_df_start_order=X_df
+        self.y_df_start_order=y_df
+
         predict_select = np.random.choice(np.arange(y_df.shape[0]), size=self.predict_n, replace=False)
         self.predict_idx = predict_select
         self.X_predict = X_df.iloc[predict_select]
@@ -228,18 +234,16 @@ class VBHelper:
         return X_df, y_df
 
     @staticmethod
-    def saveFullFloatXy(X_df, y_df):
+    def saveFullFloatXy(X_df, y_df, X_df_s, y_df_s):
         mvh = MissingValHandler({
             'impute_strategy': 'impute_knn5'  # 'pass-through'
         })
         mvh = mvh.fit(X_df)
-        X_float = mvh.transform(X_df)
-        X_float_df = pd.DataFrame(data=X_float,
-                                  columns=mvh.get_feature_names(input_features=X_df.columns.to_list()))
-        X_json_s = X_float_df.to_json()  # _json_s is json-string
-        y_json_s = y_df.to_json()
-        X_nan_bool_s = X_df.isnull().to_json()
-
+        X_float = mvh.transform(X_df_s)
+        X_float_df = pd.DataFrame(data=X_float, columns=mvh.get_feature_names(input_features=X_df_s.columns.to_list()))
+        X_json_s = X_float_df.to_json()
+        y_json_s = y_df_s.to_json()
+        X_nan_bool_s = X_df_s.isnull().to_json()
         summary_data = {'full_float_X': X_json_s, 'full_y': y_json_s, 'X_nan_bool': X_nan_bool_s}
         return summary_data
 
@@ -255,10 +259,6 @@ class VBHelper:
 
     def setModelDict(self, pipe_dict=None):
         self.logger.log("Model(s) initialization started...", self.step_n, message="Cross validation")
-        # if pipe_dict is None:
-        #     self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in self.estimator_dict.items()}
-        # else:
-        #     self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in pipe_dict.items()}
         if pipe_dict is None:
             pipe_dict = {}
             if self.run_stacked:
@@ -327,8 +327,6 @@ class VBHelper:
                             if not est_n in new_results:
                                 new_results[est_n] = []
                             new_results[est_n].append(m)
-                            # lil_x = self.X_df.iloc[0:2]
-                            # logger.info(f'est_n yhat test: {m.predict(lil_x)}')
                     for est_n in new_results:
                         if est_n in cv_results:
                             est_n += '_fcombo'
