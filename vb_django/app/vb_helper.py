@@ -93,17 +93,12 @@ class VBHelper:
             "type": "bool",
             "options": "True,False",
             "value": True
-        },
-        "predict_n": {
-            "type": "int",
-            "options": "1:n/3",
-            "value": 3
         }
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
     def __init__(self, pipeline_id, test_share=0.2, cv_folds=5, cv_reps=2, random_state=0, cv_strategy=None, run_stacked=True,
-                 cv_n_jobs=4, drop_duplicates=False, nan_threshold=0.99, shuffle=True, predict_n=3):
+                 cv_n_jobs=4, drop_duplicates=False, nan_threshold=0.99, shuffle=True):
         self.id = pipeline_id
         self.logger = VBLogger(self.id)
         self.step_n = 16
@@ -116,8 +111,8 @@ class VBHelper:
         self.drop_duplicates = drop_duplicates
         self.nan_threshold = nan_threshold
         self.shuffle = shuffle
-        self.predict_n = predict_n
-        self.predict_idx = None
+        # self.predict_n = predict_n
+        # self.predict_idx = None
 
         self.dep_var_name = None
         self.scorer_list = ['neg_mean_squared_error', 'neg_mean_absolute_error', 'r2']
@@ -172,12 +167,12 @@ class VBHelper:
         self.X_df_start_order=X_df
         self.y_df_start_order=y_df
 
-        predict_select = np.random.choice(np.arange(y_df.shape[0]), size=self.predict_n, replace=False)
-        self.predict_idx = predict_select
-        self.X_predict = X_df.iloc[predict_select]
-        X_df.drop(index=predict_select, inplace=True)
-        self.y_predict = y_df.iloc[predict_select]
-        y_df.drop(index=predict_select, inplace=True)
+        # predict_select = np.random.choice(np.arange(y_df.shape[0]), size=self.predict_n, replace=False)
+        # self.predict_idx = predict_select
+        # self.X_predict = X_df.iloc[predict_select]
+        # X_df.drop(index=predict_select, inplace=True)
+        # self.y_predict = y_df.iloc[predict_select]
+        # y_df.drop(index=predict_select, inplace=True)
 
         # Data shuffling
         shuf = np.arange(y_df.shape[0])

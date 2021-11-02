@@ -77,11 +77,24 @@ class DaskTasks:
         project.save()
 
         df = load_dataset(dataset_id, dataset)
-        pipeline_metadata = Metadata(parent=Pipeline.objects.get(id=pipeline_id)).get_metadata("PipelineMetadata")
-        project_metadata = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
+        dataset_metadata = Metadata(parent=dataset)
+        pipeline_metadata = Metadata(parent=pipeline).get_metadata("PipelineMetadata")
+        project_metadata = Metadata(parent=project).get_metadata("ProjectMetadata")
 
-        target_label = "response" if "target" not in project_metadata.keys() else project_metadata["target"]
+        target_label = None if "target" not in project_metadata.keys() else project_metadata["target"]
         features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
+
+        target_label = "target" if ("target" not in dataset_metadata.keys() and target_label is None) else json.loads(dataset_metadata["target"])
+
+        if "features" not in dataset_metadata.keys() and features_label is None:
+            features_label = None
+        else:
+            features_label = dataset_metadata["features"]
+        if features_label is None or features_label == "*":
+            features_label = list(df.columns)
+            features_label.remove(target_label)
+        else:
+            features_label = json.loads(features_label)
 
         # STAGE 2 - Data prep
         update_status(

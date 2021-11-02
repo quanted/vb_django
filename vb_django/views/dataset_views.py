@@ -162,33 +162,26 @@ class DatasetView(viewsets.ViewSet):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
         return Response("No dataset 'id' in request.", status=status.HTTP_400_BAD_REQUEST)
 
-    @swagger_auto_schema(manual_parameters=[project_id_p, dataset_id_p])
+    @swagger_auto_schema(manual_parameters=[dataset_id_p])
     @action(detail=False, methods=["GET"], name="Get information about missing data in the dataset")
     def get_missing_vals(self, request):
         """
         GET request to process and retrieve the missing values of a specified dataset. Requires association with a project and a project_id.
-        :param request: GET query containing project_id and the dataset_id.
+        :param request: GET query containing the dataset_id.
         :return: 401 for unauthorized requests, 200 and error message for an invalid request, 200 with data if valid
         """
         input_data = self.request.query_params
-        required_parameters = ["project_id", "dataset_id"]
+        required_parameters = ["dataset_id"]
         if set(required_parameters).issubset(input_data.keys()):
             dataset_id = input_data["dataset_id"]
-            project_id = input_data["project_id"]
             try:
                 dataset = Dataset.objects.get(pk=dataset_id)
             except Dataset.DoesNotExist:
                 return Response("No dataset found for id: {}".format(dataset_id), status=status.HTTP_400_BAD_REQUEST)
             if not IsOwner().has_object_permission(request, self, dataset):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
-            try:
-                project = Project.objects.get(pk=project_id)
-            except Project.DoesNotExist:
-                return Response("No dataset found for id: {}".format(project_id), status=status.HTTP_400_BAD_REQUEST)
-            if not IsOwner().has_object_permission(request, self, project):
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
 
-            de = DataExploration(dataset_id=dataset_id, project_id=project_id)
+            de = DataExploration(dataset_id=dataset_id)
             data = de.get_missing_vals()
             response_status = status.HTTP_200_OK
             return Response(data, status=response_status)
@@ -196,38 +189,31 @@ class DatasetView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
-    @swagger_auto_schema(manual_parameters=[project_id_p, dataset_id_p, num_cols_p, keep_cats_p])
+    @swagger_auto_schema(manual_parameters=[dataset_id_p, num_cols_p, keep_cats_p])
     @action(detail=False, methods=["GET"], name="Get component data in the dataset")
     def get_components(self, request):
         """
         GET request to process and retrieve the component data of a specified dataset.
-        :param request: GET query containing project_id and the dataset_id.
+        :param request: GET query containing the dataset_id.
         Optional num_cols and keep_cats for configuring the components.
         :return: 401 for unauthorized requests, 200 and error message for an invalid request, 200 with data if valid
         """
         input_data = self.request.query_params
-        required_parameters = ["project_id", "dataset_id"]
+        required_parameters = ["dataset_id"]
         if set(required_parameters).issubset(input_data.keys()):
             dataset_id = input_data["dataset_id"]
-            project_id = input_data["project_id"]
             try:
                 dataset = Dataset.objects.get(pk=dataset_id)
             except Dataset.DoesNotExist:
                 return Response("No dataset found for id: {}".format(dataset_id), status=status.HTTP_400_BAD_REQUEST)
             if not IsOwner().has_object_permission(request, self, dataset):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
-            try:
-                project = Project.objects.get(pk=project_id)
-            except Project.DoesNotExist:
-                return Response("No dataset found for id: {}".format(project_id), status=status.HTTP_400_BAD_REQUEST)
-            if not IsOwner().has_object_permission(request, self, project):
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
             de_args = {}
             if "num_cols" in input_data.keys():
                 de_args["num_cols"] = input_data["num_cols"]
             if "keep_cats" in input_data.keys():
                 de_args["keep_cats"] = "False" != input_data["keep_cats"]
-            de = DataExploration(dataset_id=dataset_id, project_id=project_id)
+            de = DataExploration(dataset_id=dataset_id)
             data = de.get_components(**de_args)
             response_status = status.HTTP_200_OK
             return Response(data, status=response_status)
@@ -235,32 +221,25 @@ class DatasetView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
-    @swagger_auto_schema(manual_parameters=[project_id_p, dataset_id_p])
+    @swagger_auto_schema(manual_parameters=[dataset_id_p])
     @action(detail=False, methods=["GET"], name="Get kernel density data in the dataset")
     def get_kernel_densities(self, request):
         """
         GET request for processing and retrieving the gaussian densities of the specified dataset.
-        :param request: GET query containing project_id and the dataset_id.
+        :param request: GET query containing the dataset_id.
         :return: 401 for unauthorized requests, 200 and error message for an invalid request, 200 with data if valid
         """
         input_data = self.request.query_params
-        required_parameters = ["project_id", "dataset_id"]
+        required_parameters = [ "dataset_id"]
         if set(required_parameters).issubset(input_data.keys()):
             dataset_id = input_data["dataset_id"]
-            project_id = input_data["project_id"]
             try:
                 dataset = Dataset.objects.get(pk=dataset_id)
             except Dataset.DoesNotExist:
                 return Response("No dataset found for id: {}".format(dataset_id), status=status.HTTP_400_BAD_REQUEST)
             if not IsOwner().has_object_permission(request, self, dataset):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
-            try:
-                project = Project.objects.get(pk=project_id)
-            except Project.DoesNotExist:
-                return Response("No dataset found for id: {}".format(project_id), status=status.HTTP_400_BAD_REQUEST)
-            if not IsOwner().has_object_permission(request, self, project):
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
-            de = DataExploration(dataset_id=dataset_id, project_id=project_id)
+            de = DataExploration(dataset_id=dataset_id)
             data = de.get_kerneldensity()
             response_status = status.HTTP_200_OK
             return Response(data, status=response_status)
@@ -268,37 +247,30 @@ class DatasetView(viewsets.ViewSet):
         response_status = status.HTTP_200_OK
         return Response(data, status=response_status)
 
-    @swagger_auto_schema(manual_parameters=[project_id_p, dataset_id_p, linkage_p, dist_p])
+    @swagger_auto_schema(manual_parameters=[dataset_id_p, linkage_p, dist_p])
     @action(detail=False, methods=["GET"], name="Get dendrogram data in the dataset")
     def get_dendrogram(self, request):
         """
         GET request for processing and retrieving the dendrogram data of the specified dataset.
-        :param request: GET query containing project_id and the dataset_id.
+        :param request: GET query containing the dataset_id.
         :return: 401 for unauthorized requests, 200 and error message for an invalid request, 200 with data if valid
         """
         input_data = self.request.query_params
-        required_parameters = ["project_id", "dataset_id"]
+        required_parameters = ["dataset_id"]
         if set(required_parameters).issubset(input_data.keys()):
             dataset_id = input_data["dataset_id"]
-            project_id = input_data["project_id"]
             try:
                 dataset = Dataset.objects.get(pk=dataset_id)
             except Dataset.DoesNotExist:
                 return Response("No dataset found for id: {}".format(dataset_id), status=status.HTTP_400_BAD_REQUEST)
             if not IsOwner().has_object_permission(request, self, dataset):
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
-            try:
-                project = Project.objects.get(pk=project_id)
-            except Project.DoesNotExist:
-                return Response("No dataset found for id: {}".format(project_id), status=status.HTTP_400_BAD_REQUEST)
-            if not IsOwner().has_object_permission(request, self, project):
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
             dargs = {}
             if "linkage" in input_data.keys():
                 dargs["linkage"] = input_data["linkage"]
             if "dist" in input_data.keys():
                 dargs["dist"] = input_data["dist"]
-            de = DataExploration(dataset_id=dataset_id, project_id=project_id)
+            de = DataExploration(dataset_id=dataset_id)
             data = de.get_dendrogram(**dargs)
             response_status = status.HTTP_200_OK
             return Response(data, status=response_status)

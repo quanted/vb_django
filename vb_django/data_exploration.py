@@ -9,24 +9,24 @@ import pandas as pd
 
 class DataExploration:
 
-    def __init__(self, dataset_id, project_id):
+    def __init__(self, dataset_id):
         # TODO: replace the need for the project_id with providing the target variable
         self.dataset_id = dataset_id
-        self.project_id = project_id
         self.dataset = Dataset.objects.get(pk=dataset_id)
-        self.project = Project.objects.get(pk=project_id)
 
         self.df = load_dataset(dataset_id, self.dataset)
-        self.project_metadata = Metadata(parent=Project.objects.get(id=project_id)).get_metadata("ProjectMetadata")
-        self.target_label = "response" if "target" not in self.project_metadata.keys() else self.project_metadata["target"]
-        self.features_label = None if "features" not in self.project_metadata.keys() else self.project_metadata["features"]
+        self.dataset_metadata = Metadata(parent=self.dataset).get_metadata("DatasetMetadata")
+
+        self.target_label = "target" if "target" not in self.dataset_metadata.keys() else self.dataset_metadata["target"]
+        self.features_label = None if "features" not in self.dataset_metadata.keys() else self.dataset_metadata["features"]
+        if self.features_label is None or self.features_label == "*":
+            self.features_label = list(self.df.columns)
+            self.features_label.remove(self.target_label)
+        else:
+            self.features_label = json.loads(self.features_label)
 
         self.y_df = self.df[self.target_label].to_frame()
-        if self.features_label:
-            self.features_list = json.loads(self.features_label.replace("\'", "\""))
-            self.X_df = self.df[self.features_list]
-        else:
-            self.X_df = self.df.drop(self.target_label, axis=1)
+        self.X_df = self.df[self.features_label]
 
         self.vbhelper = VBHelper(pipeline_id=-1)
         self.vbhelper.setData(X_df=self.X_df, y_df=self.y_df)
