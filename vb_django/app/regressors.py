@@ -20,11 +20,6 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -38,11 +33,11 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
+    def __init__(self, pipeline_id=None, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
                  gridpoints=4, inner_cv=None, groupcount=None, impute_strategy=None,
                  bestT=False, cat_idx=None, float_idx=None):
         self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
         self.inner_cv = inner_cv
         self.groupcount = groupcount
@@ -50,8 +45,9 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
         self.cat_idx = cat_idx
         self.float_idx = float_idx
         self.prep_dict = prep_dict
+        self.impute_strategy = impute_strategy
         if impute_strategy:
-            self.prep_dict["impute_strategy"] = impute_strategy
+            self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def get_pipe(self, ):
@@ -62,13 +58,11 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
         gridpoints = self.gridpoints
         transformer_list = [None_T(), Log_T(), LogP1_T()]  # ,logp1_T()] # log_T()]#
         steps = [
-            ('shrink_k1', ShrinkBigKTransformer(selector=LassoLarsCV(cv=inner_cv, max_iter=32))),
-            # retain a subset of the best original variables
+            ('shrink_k1', ShrinkBigKTransformer(selector=LassoLarsCV(cv=inner_cv, max_iter=32))),   # retain a subset of the best original variables
             ('polyfeat', PolynomialFeatures(interaction_only=0, degree=2)),  # create interactions among them
 
             ('drop_constant', DropConst()),
-            ('shrink_k2', ShrinkBigKTransformer(selector=LassoLarsCV(cv=inner_cv, max_iter=64))),
-            # pick from all of those options
+            ('shrink_k2', ShrinkBigKTransformer(selector=LassoLarsCV(cv=inner_cv, max_iter=64))),   # pick from all of those options
             ('reg', LinearRegression())]
         if self.bestT:
             steps.insert(0, ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))))

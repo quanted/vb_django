@@ -77,14 +77,14 @@ class DaskTasks:
         project.save()
 
         df = load_dataset(dataset_id, dataset)
-        dataset_metadata = Metadata(parent=dataset)
+        dataset_metadata = Metadata(parent=dataset).get_metadata("DatasetMetadata")
         pipeline_metadata = Metadata(parent=pipeline).get_metadata("PipelineMetadata")
         project_metadata = Metadata(parent=project).get_metadata("ProjectMetadata")
 
         target_label = None if "target" not in project_metadata.keys() else project_metadata["target"]
         features_label = None if "features" not in project_metadata.keys() else project_metadata["features"]
 
-        target_label = "target" if ("target" not in dataset_metadata.keys() and target_label is None) else json.loads(dataset_metadata["target"])
+        target_label = "target" if ("target" not in dataset_metadata.keys() and target_label is None) else dataset_metadata["target"]
 
         if "features" not in dataset_metadata.keys() and features_label is None:
             features_label = None
@@ -95,6 +95,9 @@ class DaskTasks:
             features_label.remove(target_label)
         else:
             features_label = json.loads(features_label)
+        drop_vars = [] if "drop_features" not in project_metadata.keys() else json.loads(project_metadata["drop_features"].replace("\'", "\""))
+        for d in drop_vars:
+            features_label.remove(d)
 
         # STAGE 2 - Data prep
         update_status(
@@ -104,10 +107,9 @@ class DaskTasks:
             message="Cross validation"
         )
 
-        target = df[target_label]
+        target = df[target_label].to_frame()
         if features_label:
-            features_list = json.loads(features_label.replace("\'", "\""))
-            features = df[features_list]
+            features = df[features_label]
         else:
             features = df.drop(target_label, axis=1)
 
@@ -128,7 +130,8 @@ class DaskTasks:
         try:
             vbhelper = VBHelper(**vbhelper_parameters)
             if "estimators" in pipeline_metadata.keys():
-                estimators = json.loads(pipeline_metadata["estimators"].replace("\'", "\""))
+                est_str = pipeline_metadata["estimators"].replace("\'", "\"")
+                estimators = json.loads(est_str)
             else:
                 update_status(pipeline_id, "Error: VB Helper requires an estimator.",
                               "-1/{}".format(pre_processing_steps),
@@ -140,9 +143,10 @@ class DaskTasks:
             vbhelper.setData(X_df=features, y_df=target)
             inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5, 'cv_strategy': ('quantile', 5)}
             inner_cv = vbhelper.getCV(cv_dict=inner_cv_dict)
-            prep_dict = {'impute_strategy': 'impute_knn5', 'cat_idx': vbhelper.cat_idx}
+            prep_dict = {'cat_approach': 'together', 'impute_strategy': 'IterativeImputer', 'cat_idx': vbhelper.cat_idx}
+            # prep_dict = {'cat_idx': vbhelper.cat_idx}
             pipe_kwargs = dict(do_prep=not vbhelper.run_stacked, prep_dict=prep_dict, inner_cv=inner_cv,
-                               gridpoints=4, cat_idx=vbhelper.cat_idx, float_idx=vbhelper.float_idx,
+                               cat_idx=vbhelper.cat_idx, float_idx=vbhelper.float_idx,
                                bestT=False)
             estimators_dict = {}
             e_i = 0
@@ -166,6 +170,7 @@ class DaskTasks:
                 vbhelper.runCrossValidate()
                 vbhelper.buildCVScoreDict()
             else:
+                #TODO: check processing for non-outer-cv instance for data cleanup
                 vbhelper.fitEstimators()
             try:
                 model = Model.objects.get(pipeline=pipeline)

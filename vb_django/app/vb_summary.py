@@ -111,7 +111,6 @@ class VBSummary:
             r = round(r_sort[float_idx[idx]], 2)
             data["dk"][name] = ({"type": "variable", "r": r, "value": z, "positions": pos})
         for idx, name in enumerate(cat_var_dict.keys()):
-            # TODO: Categorical variable pie charts data untested
             cat_flavors, var_names = zip(*cat_var_dict[name])
             cum_r = np.sum(np.abs(np.array([r_sort[cat_idx_list[cat_vars.index(cat)]] for cat in var_names])))
             cat_df = self.full_X_float_df.loc[:, var_names]
@@ -171,7 +170,7 @@ class VBSummary:
 
         labels = ['missing data']
         colors = [plt.get_cmap('plasma')(value) for value in [255]]
-        data["colors"] = colors
+        # data["colors"] = colors
         # patches = [Patch(color=colors[i], label=labels[i]) for i in [0]]
         # data["p3"]["legend"] = patches
 

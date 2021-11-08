@@ -20,11 +20,6 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -43,11 +38,11 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
+    def __init__(self, pipeline_id=None, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
                  gridpoints=4, inner_cv=None, groupcount=None, impute_strategy=None,
                  float_idx=None, cat_idx=None, bestT=False):
-        self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
+        self.pipeline_id = pipeline_id
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
         self.inner_cv = inner_cv
         self.groupcount = groupcount
@@ -55,8 +50,9 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
         self.cat_idx = cat_idx
         self.float_idx = float_idx
         self.prep_dict = prep_dict
+        self.impute_strategy = impute_strategy
         if impute_strategy:
-            self.prep_dict["impute_strategy"] = impute_strategy
+            self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def get_pipe(self,):
@@ -89,11 +85,6 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -107,11 +98,11 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
+    def __init__(self, pipeline_id=None, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
                  gridpoints=4, inner_cv=None, groupcount=None, impute_strategy=None,
                  bestT=False, cat_idx=None, float_idx=None):
-        self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
+        self.pipeline_id = pipeline_id
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
         self.inner_cv = inner_cv
         self.groupcount = groupcount
@@ -119,8 +110,9 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
         self.cat_idx = cat_idx
         self.float_idx = float_idx
         self.prep_dict = prep_dict
+        self.impute_strategy = impute_strategy
         if impute_strategy:
-            self.prep_dict["impute_strategy"] = impute_strategy
+            self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def get_pipe(self,):

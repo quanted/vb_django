@@ -17,11 +17,6 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -31,15 +26,20 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
             "type": "int",
             "options": "1:5",
             "value": 5
+        },
+        "max_n_alphas": {
+            "type": "int",
+            "options": "1:2000",
+            "value": 1000
         }
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
+    def __init__(self, pipeline_id=None, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
                  gridpoints=4, inner_cv=None, groupcount=None, impute_strategy=None,
-                 bestT=False, cat_idx=None, float_idx=None):
-        self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
+                 bestT=False, cat_idx=None, float_idx=None, max_n_alphas=1000):
+        self.pipeline_id = pipeline_id
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
         self.inner_cv = inner_cv
         self.groupcount = groupcount
@@ -47,8 +47,10 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
         self.cat_idx = cat_idx
         self.float_idx = float_idx
         self.prep_dict = prep_dict
+        self.max_n_alphas = max_n_alphas
+        self.impute_strategy = impute_strategy
         if impute_strategy:
-            self.prep_dict["impute_strategy"] = impute_strategy
+            self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def get_pipe(self):
@@ -57,7 +59,7 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
         else:
             inner_cv = self.inner_cv
 
-        steps = [('reg', LassoLarsCV(cv=inner_cv,))]
+        steps = [('reg', LassoLarsCV(cv=inner_cv, max_n_alphas=self.max_n_alphas))]
         if self.bestT:
             steps.insert(0, 'xtransform', ColumnBestTransformer(float_k=len(self.float_idx)))
         outerpipe = Pipeline(steps=steps)

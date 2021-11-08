@@ -11,7 +11,8 @@ import numpy as np
 
 
 class MissingValHandler(BaseEstimator, TransformerMixin):
-    def __init__(self, prep_dict=None):
+    def __init__(self, pipeline_id=None, prep_dict=None):
+        self.pipeline_id = pipeline_id
         self.prep_dict = prep_dict
 
         self.strategy = None
@@ -150,6 +151,7 @@ class MissingValHandler(BaseEstimator, TransformerMixin):
             if type(X) != pd.DataFrame:
                 X = pd.DataFrame(X)
             X = X.dropna(axis=0)
+        # print(f"Transforming X:{X}")
         X = self.T_.transform(X)
         if len(self.obj_idx_) > 0 and len(self.float_idx_) > 0 and self.cat_approach == 'together':
             X = self.T1_.transform(X)

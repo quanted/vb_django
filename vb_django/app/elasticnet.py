@@ -19,11 +19,6 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -37,21 +32,22 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id, do_prep='True', prep_dict=None, impute_strategy=None,
-                 gridpoints=4, inner_cv=None, groupcount=None,
-                 float_idx=None, cat_idx=None, bestT=False):
-        self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
+    def __init__(self, pipeline_id=None, do_prep=True, prep_dict={'impute_strategy': 'impute_knn5'}, impute_strategy=None,
+                     gridpoints=4, inner_cv=None, groupcount=None,
+                     float_idx=None, cat_idx=None, bestT=False):
+        self.pipeline_id = pipeline_id
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
         self.groupcount = groupcount
         self.float_idx = float_idx
         self.cat_idx = cat_idx
         self.bestT = bestT
         self.inner_cv = inner_cv
-        self.prep_dict = {'impute_strategy': self.hyper_parameters["impute_strategy"]["value"]} if prep_dict is None else prep_dict
-        if impute_strategy:
-            self.prep_dict["impute_strategy"] = impute_strategy
+        self.prep_dict = prep_dict
         self.flags = None
+        self.impute_strategy = impute_strategy
+        if impute_strategy:
+            self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def set_params(self, hyper_parameters):
@@ -59,18 +55,18 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
             return
         # TODO: Update output to display the hyper-parameter values used.
         # Validation of user specified impute_strategy
-        if "impute_strategy" in hyper_parameters.keys():
-            if hyper_parameters["impute_strategy"] in self.hyper_parameters["impute_strategy"]["options"]:
-                self.impute_strategy = hyper_parameters["impute_strategy"]
+        # if "impute_strategy" in hyper_parameters.keys():
+        #     if hyper_parameters["impute_strategy"] in self.hyper_parameters["impute_strategy"]["options"]:
+        #         self.impute_strategy = hyper_parameters["impute_strategy"]
         # Validation of user specified gridpoints
         if "gridpoints" in hyper_parameters.keys():
             gp_range = self.hyper_parameters["gridpoints"]["options"].split(":")
             if int(gp_range[0]) <= int(hyper_parameters["gridpoints"]) <= int(gp_range[1]):
                 self.gridpoints = int(hyper_parameters["gridpoints"])
         # Validation of user specified cv_strategy
-        if "cv_strategy" in hyper_parameters.keys():
-            if hyper_parameters["cv_strategy"] in self.hyper_parameters["cv_strategy"]["options"]:
-                self.cv_strategy = hyper_parameters["cv_strategy"]
+        # if "cv_strategy" in hyper_parameters.keys():
+        #     if hyper_parameters["cv_strategy"] in self.hyper_parameters["cv_strategy"]["options"]:
+        #         self.cv_strategy = hyper_parameters["cv_strategy"]
         # Validation of user specified groupcount
         if "groupcount" in hyper_parameters.keys():
             gp_range = self.hyper_parameters["groupcount"]["options"].split(":")
@@ -87,10 +83,11 @@ class ENet(BaseEstimator, TransformerMixin, BaseHelper):
         else:
             inner_cv = self.inner_cv
         gridpoints = self.gridpoints
-        l1_ratio = 1 - np.logspace(-2, -.03, gridpoints)
+        n_alphas = gridpoints * 5
+        l1_ratio = 1 - np.logspace(-2, -.03, gridpoints * 2)
         steps = [
             ('scaler', StandardScaler()),
-            ('reg', ElasticNetCV(cv=inner_cv, normalize=False, l1_ratio=l1_ratio))]
+            ('reg', ElasticNetCV(cv=inner_cv, normalize=False, l1_ratio=l1_ratio, n_alphas=n_alphas))]
 
         if self.bestT:
             steps.insert(0, ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))))

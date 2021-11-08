@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import RepeatedKFold, GridSearchCV
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -65,6 +65,9 @@ class FlexibleEstimator(BaseEstimator, RegressorMixin, VBLogger):
     def pipe_residuals(self, B, X, y):
         return self.pipe_(B, X) - y
 
+    def pipe_sq_residuals(self, B, X, y):
+        return np.sum((self.pipe_(B, X)-y)**2)
+
     def fit(self, X, y):
         if self.form == 'expXB':
             self.pipe_ = self.expXB
@@ -82,8 +85,7 @@ class FlexibleEstimator(BaseEstimator, RegressorMixin, VBLogger):
                 self.k += 1
         # https://scipy-cookbook.readthedocs.io/items/robust_regression.html
         if self.robust:
-            self.fit_est_ = least_squares(self.pipe_residuals, np.ones(self.k), args=(X, y), loss='soft_l1',
-                                          f_scale=0.1, )  #
+            self.fit_est_ = minimize(self.pipe_sq_residuals, np.ones(self.k),args=(X, y),method='BFGS')  #
         else:
             self.fit_est_ = least_squares(self.pipe_residuals, np.ones(self.k), args=(X, y))  #
         return self
@@ -107,11 +109,6 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
             "options": ['True', 'False'],
             "value": 'True'
         },
-        "impute_strategy": {
-            "type": "str",
-            "options": ['impute_knn5'],
-            "value": "impute_knn5"
-        },
         "gridpoints": {
             "type": "int",
             "options": "1:8",
@@ -126,18 +123,23 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
             "type": "int",
             "options": "1:5",
             "value": 5
+        },
+        "functional_form_search": {
+            "type": "bool",
+            "options": "True,False",
+            "value": False
         }
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
     def __init__(
-            self, pipeline_id, do_prep='True', functional_form_search=False,
+            self, pipeline_id=None, do_prep='True', functional_form_search="False",
             prep_dict={'impute_strategy': 'impute_knn5'}, gridpoints=4,
             inner_cv=None, groupcount=None, bestT=False,
             cat_idx=None, float_idx=None, flex_kwargs={}
     ):
-        self.pid = pipeline_id
-        self.do_prep = do_prep == 'True'
-        self.functional_form_search = functional_form_search
+        self.pipeline_id = pipeline_id
+        self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
+        self.functional_form_search = functional_form_search if type(functional_form_search) == bool else functional_form_search == "True"
         self.gridpoints = gridpoints
         self.inner_cv = inner_cv
         self.groupcount = groupcount
@@ -146,6 +148,7 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
         self.float_idx = float_idx
         self.prep_dict = prep_dict
         self.flex_kwargs = flex_kwargs
+        self.flex_kwargs["robust"] = True
         BaseHelper.__init__(self)
 
     def get_pipe(self, ):

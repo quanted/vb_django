@@ -26,7 +26,7 @@ def update_status(_id, status, stage, message=None, retry=5, log=None):
         m.set_metadata(meta)
         if log:
             logger.info(log)
-        PipelineLog(pipeline=amodel, logtype=status, log=f"Stage: {stage}, Message: {message}", timestamp=str(datetime.datetime.now().timestamp()))
+        PipelineLog(parent=amodel, logtype=status, log=f"Stage: {stage}, Message: {message}", timestamp=str(datetime.datetime.now().timestamp()))
     except Exception as ex:
         logger.warning("Error attempting to save status update: {}".format(ex))
         update_status(_id, status, stage, None, retry - 1)
@@ -46,7 +46,7 @@ def save_dataset(data: str, dataset_id=None):
     return ce_str
 
 
-def load_dataset(dataset_id, dataset=None):
+def load_dataset(dataset_id, dataset=None, replace_nan=False):
     if not dataset:
         try:
             dataset = Dataset.objects.get(id=int(dataset_id))
@@ -54,6 +54,8 @@ def load_dataset(dataset_id, dataset=None):
             return None
     ce_df = zlib.decompress(dataset.data)
     df = pd.read_csv(StringIO(bytes(ce_df).decode()))
+    if replace_nan:
+        df = df.fillna('')
     return df
 
 
