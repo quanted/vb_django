@@ -1,14 +1,15 @@
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import RepeatedKFold, GridSearchCV
 # from sklearn.experimental import enable_hist_gradient_boosting
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor
+from sklearn.linear_model import LassoLarsCV
 from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 
 
-class GBR(BaseEstimator, TransformerMixin, BaseHelper):
+class GBR(BaseEstimator, RegressorMixin, BaseHelper):
     name = "Gradient Boosting Regressor"
     ptype = "gbr"
     description = "GB builds an additive model in a forward stage-wise fashion; it allows for the optimization " \
@@ -48,7 +49,7 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=1, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
         else:
             inner_cv = self.inner_cv
         if self.est_kwargs is None:
@@ -57,8 +58,9 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
         hyper_param_dict, gbr_params = self.extractParams(self.est_kwargs)
         if not 'random_state' in gbr_params:
             gbr_params['random_state'] = 0
-        steps = [
-            ('reg', GridSearchCV(GradientBoostingRegressor(**gbr_params), param_grid=hyper_param_dict, cv=inner_cv))]
+        # hyper_param_dict = {}
+        steps = [('reg', GridSearchCV(GradientBoostingRegressor(), param_grid=hyper_param_dict, cv=inner_cv))]
+
         if self.bestT:
             steps.insert(0, ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))))
         outerpipe = Pipeline(steps=steps)
@@ -69,7 +71,7 @@ class GBR(BaseEstimator, TransformerMixin, BaseHelper):
         return outerpipe
 
 
-class HGBR(BaseEstimator, TransformerMixin, BaseHelper):
+class HGBR(BaseEstimator, RegressorMixin, BaseHelper):
     name = "Histogram Gradient Boosting Regressor"
     ptype = "hgbr"
     description = "Histogram-based Gradient Boosting Regression Tree."
