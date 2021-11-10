@@ -24,7 +24,9 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
-    def __init__(self, pipeline_id=None, do_prep=True, prep_dict={'impute_strategy': 'impute_knn5'}, impute_strategy=None, inner_cv=None, bestT=False, cat_idx=None, float_idx=None, est_kwargs=None):
+    def __init__(self, pipeline_id=None, do_prep=True, prep_dict={'impute_strategy': 'impute_knn5'},
+                 impute_strategy=None, inner_cv=None, bestT=False, cat_idx=None, float_idx=None, est_kwargs=None,
+                 cv_splits=5, cv_repeats=2):
         self.pipeline_id = pipeline_id
         self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.bestT = bestT
@@ -33,6 +35,8 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
         self.inner_cv = inner_cv
         self.prep_dict = prep_dict
         self.est_kwargs = est_kwargs
+        self.cv_splits = cv_splits
+        self.cv_repeats = cv_repeats
         self.impute_strategy = impute_strategy
         if impute_strategy:
             self.prep_dict["impute_strategy"] = self.impute_strategy
@@ -49,7 +53,7 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
         if self.est_kwargs is None:
@@ -58,7 +62,6 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
         hyper_param_dict, gbr_params = self.extractParams(self.est_kwargs)
         if not 'random_state' in gbr_params:
             gbr_params['random_state'] = 0
-        # hyper_param_dict = {}
         steps = [('reg', GridSearchCV(GradientBoostingRegressor(), param_grid=hyper_param_dict, cv=inner_cv))]
 
         if self.bestT:

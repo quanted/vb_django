@@ -391,7 +391,7 @@ class VBHelper:
     def evaluate(self):
         full_results = self.arrayDictToListDict(
             {
-                'y': self.y_df.to_list(),
+                'y': self.y_df.iloc[:, 0].to_list(),
                 'cv_yhat': self.cv_yhat_dict,
                 'cv_score': self.cv_score_dict,
                 'project_cv': self.project_CV_dict,

@@ -37,7 +37,7 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
 
     def __init__(self, pipeline_id=None, do_prep='True', prep_dict={'impute_strategy': 'impute_knn5'},
                  gridpoints=4, inner_cv=None, groupcount=None, impute_strategy=None,
-                 bestT=False, cat_idx=None, float_idx=None, max_n_alphas=1000):
+                 bestT=False, cat_idx=None, float_idx=None, max_n_alphas=1000, cv_splits=5, cv_repeats=2):
         self.pipeline_id = pipeline_id
         self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.gridpoints = gridpoints
@@ -49,13 +49,15 @@ class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
         self.prep_dict = prep_dict
         self.max_n_alphas = max_n_alphas
         self.impute_strategy = impute_strategy
+        self.cv_splits = cv_splits
+        self.cv_repeats = cv_repeats
         if impute_strategy:
             self.prep_dict["impute_strategy"] = self.impute_strategy
         BaseHelper.__init__(self)
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
 

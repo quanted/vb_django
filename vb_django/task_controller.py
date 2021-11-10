@@ -11,6 +11,7 @@ from vb_django.app.flexible_pipeline import FlexiblePipe
 from vb_django.app.l1lars import L1Lars
 from vb_django.app.regressors import LinRegSupreme
 from vb_django.app.svr import RBFSVR, LinSVR
+from vb_django.app.vb_plotter import VBPlotter
 import pandas as pd
 import copy
 import os
@@ -142,9 +143,9 @@ class DaskTasks:
                 return
             vbhelper.setData(X_df=features, y_df=target)
             inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5, 'cv_strategy': ('quantile', 5)}
+            # inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5}
             inner_cv = vbhelper.getCV(cv_dict=inner_cv_dict)
             prep_dict = {'cat_approach': 'together', 'impute_strategy': 'IterativeImputer', 'cat_idx': vbhelper.cat_idx}
-            # prep_dict = {'cat_idx': vbhelper.cat_idx}
             pipe_kwargs = dict(do_prep=not vbhelper.run_stacked, prep_dict=prep_dict, inner_cv=inner_cv,
                                cat_idx=vbhelper.cat_idx, float_idx=vbhelper.float_idx,
                                bestT=False)
@@ -192,11 +193,27 @@ class DaskTasks:
         return None
 
     @staticmethod
-    def evaluate(project_id, model_id):
+    def evaluate(project_id, model_id, flag=None):
         project = Project.objects.get(id=int(project_id))
         model = Model.objects.get(id=int(model_id))
         m = load_model(model.id, model.model)
-        results = m.evaluate()
+        flags = ["CVYhatVsY", "CVYhat", "CVScores", "BWCVScores"]
+        results = {}
+        if flag in flags:
+            scores = m.evaluate()
+            plotter = VBPlotter()
+            plotter.setData(scores)
+            if flag == flags[0]:
+                results[flag] = plotter.plotCVYhatVsY(single_plot=True, include_all_cv=True)
+            elif flag == flags[1]:
+                results[flag] = plotter.plotCVYhat(single_plot=True, include_all_cv=True)
+            elif flag == flags[2]:
+                results[flag] = plotter.plotCVScores(sort=1)
+            elif flag == flags[3]:
+                results[flag] = plotter.plotBoxWhiskerCVScores()
+        else:
+            results = m.evaluate()
+            results["plot_flags"] = flags
         return results
 
     @staticmethod

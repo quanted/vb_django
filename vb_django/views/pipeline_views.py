@@ -300,8 +300,9 @@ class PipelineView(viewsets.ViewSet):
                 if model is None:
                     message.append("No model found for id: {}".format(input_data["model_id"]))
                 return Response(", ".join(message), status=status.HTTP_400_BAD_REQUEST)
+            flag = input_data["flag"] if "flag" in input_data.keys() else None
             response = {}
-            results = DaskTasks.evaluate(project.id, model.id)
+            results = DaskTasks.evaluate(project.id, model.id, flag)
             response["project_id"] = project.id
             response["pipeline_id"] = model.pipeline.id
             response["model_id"] = model.id

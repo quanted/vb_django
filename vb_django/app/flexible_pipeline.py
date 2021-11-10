@@ -131,12 +131,9 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
         }
     }
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
-    def __init__(
-            self, pipeline_id=None, do_prep='True', functional_form_search="False",
-            prep_dict={'impute_strategy': 'impute_knn5'}, gridpoints=4,
-            inner_cv=None, groupcount=None, bestT=False,
-            cat_idx=None, float_idx=None, flex_kwargs={}
-    ):
+    def __init__(self, pipeline_id=None, do_prep='True', functional_form_search="False",
+                 prep_dict={'impute_strategy': 'impute_knn5'}, gridpoints=4, inner_cv=None, groupcount=None,
+                 bestT=False, cat_idx=None, float_idx=None, flex_kwargs={}, cv_splits=5, cv_repeats=2):
         self.pipeline_id = pipeline_id
         self.do_prep = do_prep == 'True' if type(do_prep) != bool else do_prep
         self.functional_form_search = functional_form_search if type(functional_form_search) == bool else functional_form_search == "True"
@@ -148,12 +145,14 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
         self.float_idx = float_idx
         self.prep_dict = prep_dict
         self.flex_kwargs = flex_kwargs
+        self.cv_splits = cv_splits
+        self.cv_repeats = cv_repeats
         self.flex_kwargs["robust"] = True
         BaseHelper.__init__(self)
 
     def get_pipe(self, ):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
 
