@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.preprocessing import KBinsDiscretizer
 
 
 class RegressorQStratifiedCV:
@@ -10,6 +11,7 @@ class RegressorQStratifiedCV:
         self.strategy = strategy
         self.cvkwargs = dict(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
         self.cv = RepeatedStratifiedKFold(**self.cvkwargs)
+        self.discretizer = KBinsDiscretizer(n_bins=self.groupcount, encode='ordinal', strategy=self.strategy)
 
     def split(self, X, y, groups=None):
         if len(y.shape) > 1:
@@ -19,12 +21,8 @@ class RegressorQStratifiedCV:
                 y_vec = y[:, 0]
         else:
             y_vec = y
-        ysort_order = np.argsort(y_vec)
-        y1 = np.ones(y_vec.shape)
-        y1split = np.array_split(y1, self.groupcount)
-        kgroups = np.empty(y_vec.shape)
-        kgroups[ysort_order] = np.concatenate([y1split[i] * i for i in range(self.groupcount)], axis=0)
-        return self.cv.split(X, kgroups)
+        kgroups = self.discretizer.fit_transform(y_vec[:, None])[:, 0]
+        return self.cv.split(X, kgroups, groups)
 
     def get_n_splits(self, X, y, groups=None):
         return self.cv.get_n_splits(X, y, groups)
