@@ -70,5 +70,7 @@ urlpatterns = [
     path('info/pipelines/', pipeline_details),
 ]
 
+urlpatterns = [path('vb/', include(urlpatterns))]
+
 load_pipelines(purge=True)
 

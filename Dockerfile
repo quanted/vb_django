@@ -9,7 +9,6 @@ RUN python -m pip install --upgrade pip setuptools wheel
 
 COPY . /opt/app/
 
-COPY requirements.txt /opt/app/requirements.txt
 RUN pip install -r /opt/app/requirements.txt
 RUN pip install uwsgi
 
@@ -17,7 +16,7 @@ COPY vb_django/uwsgi.ini /etc/uwsgi/
 RUN chown -R www-data:www-data /opt/app
 
 WORKDIR /opt/app
-ENV PYTHONPATH="/opt/app:/opt/app/vb_django:/opt/app/vb_django:${PYTHONPATH}"
-ENV NPATH="/opt/app:/opt/app/vb_django:/opt/app/vb_django:${PATH}"
+ENV PYTHONPATH="/opt/app:/opt/app/vb_django:${PYTHONPATH}"
+ENV NPATH="/opt/app:/opt/app/vb_django:${PATH}"
 USER ${APP_USER}:${APP_USER}
 #CMD ["sh", "/tmp/start-django-server.sh"]
