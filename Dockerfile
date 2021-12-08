@@ -14,10 +14,7 @@ RUN pip install -r /opt/app/requirements.txt
 RUN pip install uwsgi
 
 COPY vb_django/uwsgi.ini /etc/uwsgi/
-COPY start-server.sh /tmp/start-django-server.sh
 RUN chown -R www-data:www-data /opt/app
-RUN chmod 777 /tmp/start-django-server.sh && \
-    chown www-data:www-data /tmp/start-django-server.sh
 
 WORKDIR /opt/app/vb_django
 ENV PYTHONPATH="/opt/app:/opt/app/vb_django:/opt/app/vb_django/vb_django:${PYTHONPATH}"
