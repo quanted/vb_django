@@ -20,6 +20,7 @@ RUN chmod 777 /tmp/start-django-server.sh && \
     chown www-data:www-data /tmp/start-django-server.sh
 
 WORKDIR /opt/app/vb_django
-ENV PYTHONPATH="/opt/app:/opt/app/vb_django:${PYTHONPATH}"
+ENV PYTHONPATH="/opt/app:/opt/app/vb_django:/opt/app/vb_django/vb_django:${PYTHONPATH}"
+ENV NPATH="/opt/app:/opt/app/vb_django:/opt/app/vb_django/vb_django:${PATH}"
 USER ${APP_USER}:${APP_USER}
 #CMD ["sh", "/tmp/start-django-server.sh"]
