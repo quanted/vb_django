@@ -148,7 +148,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 # STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static')
-STATIC_ROOT = os.path.join("opt", "app", "collected_static", "vb")
+STATIC_ROOT = os.path.join("/opt", "app", "vb_django", "collected_static", "vb")
 STATICFILES_DIRS = (
     os.path.join(PROJECT_ROOT, 'static'),
 )
