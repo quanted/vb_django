@@ -1,9 +1,7 @@
 #!/bin/bash
 
-#if [ ! -d "/opt/app/vb_django/vb_django/static" ]
-#then
-#  mkdir /opt/app/vb_django/vb_django/static
-#fi
 python /opt/app/vb_django/manage.py collectstatic --noinput
-python /opt/app/vb_django/manage.py migrate
-exec uwsgi /etc/uwsgi/uwsgi.ini --show-config
+python /opt/app/vb_django/manage.py migrate --noinput
+python /opt/app/vb_django/manage.py auth --noinput          # used for login
+python /opt/app/vb_django/manage.py --noinput      # used for login
+exec uwsgi /etc/uwsgi/uwsgi.ini
