@@ -69,10 +69,6 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
         self.pipe_ = self.get_pipe()  # formerly inside basehelper
         BaseHelper.__init__(self)
 
-    """def fit(self,X,y):
-        self.pipe_.fit(X,y=y)
-        return self"""
-
     def getPrepDict(self, prep_dict):
         if self.pipelist is None:
             print('empty MultiPipe!')
@@ -88,20 +84,16 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
     def get_pipe(self):
         try:
             pipe_n = len(self.pipelist)
-            est_pipes = []
-            for i, p in enumerate(self.pipelist):
-                _p = p[1]['pipe'](**p[1]['pipe_kwargs'])
-                est_pipes.append((p[0], _p))
-            # est_pipes = [(p[0], p[1]['pipe'](**p[1]['pipe_kwargs'])) for i, p in enumerate(self.pipelist)]
+            est_pipes = [(p[0], p[1]['pipe'](**p[1]['pipe_kwargs'])) for i, p in enumerate(self.pipelist)]
             final_e = self.stacker_estimator
             steps = [
                 ('prep', MissingValHandler(prep_dict=self.prep_dict)),
-                ('post', make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=1, verbose=3)))]
+                ('post',
+                 make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=pipe_n)))]
             return Pipeline(steps=steps)
         except Exception as e:
-            print(f"Error attempting to get multiPipe pipeline, error: {e}")
-            pass
-            # assert False, 'halt'
+            print(f"Error: {e}")
+            return None
 
     def get_pipe_names(self):
         pipe_names = [pipe_tup[0] for pipe_tup in self.pipelist]

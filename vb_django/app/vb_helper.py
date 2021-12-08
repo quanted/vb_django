@@ -5,13 +5,15 @@ from vb_django.app.base_helper import MultiPipe, FCombo, NullModel
 from vb_django.app.vb_cross_validator import RegressorQStratifiedCV
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.utilities import update_status, save_model, update_pipeline_metadata
+from vb_django.app.vb_pi import CVPlusPI
 import pandas as pd
 import logging
 import copy
 import time
+import pickle
 
+logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 logger = logging.getLogger("vb_dask:task")
-logger.setLevel(logging.DEBUG)
 
 
 class VBLogger:
@@ -130,6 +132,8 @@ class VBHelper:
         self.y_test = None
         self.X_predict = None
         self.y_predict = None
+
+        self.full_results = None
         self.cat_idx, self.cat_vars = None, None
         self.float_idx = None
         self.cv_results = None
@@ -166,13 +170,6 @@ class VBHelper:
 
         self.X_df_start_order = X_df
         self.y_df_start_order = y_df
-
-        # predict_select = np.random.choice(np.arange(y_df.shape[0]), size=self.predict_n, replace=False)
-        # self.predict_idx = predict_select
-        # self.X_predict = X_df.iloc[predict_select]
-        # X_df.drop(index=predict_select, inplace=True)
-        # self.y_predict = y_df.iloc[predict_select]
-        # y_df.drop(index=predict_select, inplace=True)
 
         # Data shuffling
         shuf = np.arange(y_df.shape[0])
@@ -258,38 +255,6 @@ class VBHelper:
             self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in self.estimator_dict.items()}
         else:
             self.model_dict = {key: val['pipe'](**val['pipe_kwargs']) for key, val in pipe_dict.items()}
-        # if pipe_dict is None:
-        #     pipe_dict = {}
-        #     if self.run_stacked:
-        #         e_list = self.estimator_dict['stacking_reg']['pipe_kwargs']['pipelist']
-        #     else:
-        #         e_list = []
-        #         for n, p in self.estimator_dict.items():
-        #             e_list.append([n, p])
-        #     for e in e_list:
-        #         pipe_dict[e[0]] = e[1]
-        # model_dict = {}
-        # for key, val in pipe_dict.items():
-        #     e_args = val['pipe_kwargs']
-        #     e_args["pipeline_id"] = self.id
-        #     initialized = False
-        #     pipe = None
-        #     while not initialized:
-        #         try:
-        #             pipe = val['pipe'](**e_args)
-        #             initialized = True
-        #         except TypeError as te:
-        #             e_name = str(te).split("'")[1]
-        #             print("Removing '{}' from pipeline arguments".format(e_name))
-        #             if e_name in e_args.keys() and len(e_args) > 0:
-        #                 del e_args[e_name]
-        #             else:
-        #                 raise Exception
-        #         except Exception as ex:
-        #             print("Model Initialization error: {}".format(ex))
-        #             initialized = True
-        #     model_dict[key] = pipe
-        # self.model_dict = model_dict
         self.logger.log("Model(s) initialization complete.", self.step_n, message="Completed setup of model dictionaries")
         return self.model_dict
 
@@ -303,17 +268,19 @@ class VBHelper:
     def runCrossValidate(self, verbose=False):
         self.logger.log("Cross-validate started...", self.step_n, message="Running cross validation")
         n_jobs = self.cv_n_jobs
-        if verbose:
-            logger.info("CV N-JOBS: {}".format(n_jobs))
         cv_results = {}
         new_cv_results = {}
         cv = self.getCV()
-        n_jobs = 1
+        # n_jobs = 1
+        if verbose:
+            logger.info(f"RunCrossValidate - n_jobs: {n_jobs}, scorer_list: {self.scorer_list}")
         for pipe_name, model in self.model_dict.items():
+            if verbose:
+                logger.info(f"RunCrossValidate - Running CV on pipe_name: {pipe_name}")
             start = time.time()
             model_i = cross_validate(
                 model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
-                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs)
+                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, verbose=3)
             end = time.time()
             if verbose:
                 logger.info(f"SCORES - {pipe_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")
@@ -398,6 +365,7 @@ class VBHelper:
                 'cv_model_descrip': {}          #not developed
             }
         )
+        self.full_results = full_results
         return full_results
 
     def arrayDictToListDict(self, arr_dict):
@@ -510,55 +478,69 @@ class VBHelper:
         }
         return collection
 
-    def predictandSave(self, X_predict=None, scorer=None):
+    def predictandSave(self, X_predict=None, scorer=None, build_PI='cvplus'):
         if scorer is None:
             scorer = self.scorer_list[0]
-        if X_predict is None:
-            X_predict = self.X_predict
         if not str(X_predict.index.to_list()[0])[:7].lower() == 'predict':
             X_predict.index = [f'predict-{idx}' for idx in X_predict.index]
-        yhat = self.predict(X_predict)
-        yhat_cv = self.predict(X_predict, model_type='cross_validation')
+        yhat_predict = self.predict(X_predict)
+        self.yhat_predict = yhat_predict
+        yhat_cv_predict = self.predict(X_predict, model_type='cross_validation')
+
+        if not build_PI is None:
+            if build_PI.lower() in ['cv+', 'cvplus']:
+                prediction_interval = self.doCVPlusPI(yhat_cv_predict)
+            else:
+                assert False, f'build_PI option: {build_PI} not developed'
+        else:
+            prediction_interval = None
 
         predictresult = {
-            'yhat': yhat['prediction'][scorer].to_json(),
-            'cv_yhat': [yhat_cv_by_scorer[scorer].to_json() for yhat_cv_by_scorer in yhat_cv['prediction']],
+            'yhat_predict': yhat_predict.to_json(),  # json strings
+            'cv_yhat_predict': [yhat_predict_i.to_json() for yhat_predict_i in yhat_cv_predict],
             'X_predict': X_predict.to_json(),
-            'selected_models': [*self.prediction_models]}
+            'yhat_predict_PI': {str(build_PI): prediction_interval.to_json()},  # build_PI might be "cv+",None,...?
+            'selected_model': self.prediction_models[0]}  # just the name
         return predictresult
 
-    def predict(self, X_df_predict: pd.DataFrame, model_type: str = 'predictive'):
-        if self.model_averaging_weights is None:
-            self.setModelAveragingWeights()
-        results = {}
+    def doCVPlusPI(self, yhat_cv_predict, alpha=0.05, collapse_reps='pre_mean', true_y_predict=None):
+        y_train = np.array(self.full_results['y'])
+        cv_yhat_train_arr = np.concatenate(
+            [np.array(y_list)[None, :] for y_list in self.full_results['cv_yhat'][self.prediction_models[0]]], axis=0
+        )
+        splitter = self.getCV()
+        n_splits = self.project_CV_dict['cv_folds']
+        n_reps = self.project_CV_dict['cv_reps']
+        yhat_cv_predict_arr = np.empty([n_reps, y_train.size, yhat_cv_predict[0].shape[-1]])
+        r = 0
+        s = 0
+        for train_idx, test_idx in splitter.split(y_train):
+            assert r < n_reps
+            yhat_cv_predict_arr[r, test_idx, :] = yhat_cv_predict[r * n_splits + s].to_numpy()
+            s += 1
+            if s == n_splits:
+                r += 1
+                s = 0
 
-        if model_type == 'cross_validation':
-            wtd_yhats = [{scorer: np.zeros(X_df_predict.shape[0]) for scorer in self.scorer_list} for _ in
-                         range(self.project_CV_dict['cv_count'])]
-        else:
-            wtd_yhats = {scorer: np.zeros(X_df_predict.shape[0]) for scorer in self.scorer_list}
-        for name, est in self.prediction_models.items():
-            if model_type == 'predictive':
-                results[name] = est.predict(X_df_predict)
-                for scorer, weights in self.model_averaging_weights[name].items():
-                    wtd_yhats[scorer] += weights * results[name]
-            elif model_type == 'cross_validation':
-                results[name] = []
-                for cv_i in range(self.project_CV_dict['cv_count']):
-                    model_cv_i = self.cv_results[name]['estimator'][cv_i]
-                    results[name].append(model_cv_i.predict(X_df_predict))
-                    for scorer, weights in self.model_averaging_weights[name].items():
-                        wtd_yhats[cv_i][scorer] += weights * results[name][cv_i]
-        wtd_yhats_dfs = {}
+        # yhat_cv_predict_arr=np.concatenate([yhat_i[None,:] for yhat_i in yhat_cv_predict],axis=0) # None adds a new dimension
+        #     that will be used for concatenating the different predictions across reps and splits dims:(n_reps*n_splits,predict_n)
+        lower, upper = CVPlusPI().run(
+            y_train, cv_yhat_train_arr, yhat_cv_predict_arr,
+            alpha=alpha, collapse_reps=collapse_reps, true_y_predict=true_y_predict)
+        df = pd.DataFrame(data={f'lowerPI-{alpha}': lower, f'upperPI-{alpha}': upper}, index=yhat_cv_predict[0].index)
+        return df
+
+    def predict(self, X_df_predict: pd.DataFrame, model_type: str = 'predictive'):
+        name, est = self.prediction_models
+        results = None
         if model_type == 'predictive':
-            wtd_yhats_dfs = {scorer: pd.DataFrame(data=arr[:, None], index=X_df_predict.index, columns=['yhat']) for
-                             scorer, arr in wtd_yhats.items()}
+            results = pd.Series(data=est.predict(X_df_predict), index=X_df_predict.index, name='yhat')
         elif model_type == 'cross_validation':
-            wtd_yhats_dfs = [
-                {scorer: pd.DataFrame(data=arr[:, None], index=X_df_predict.index, columns=['yhat']) for scorer, arr in
-                 cv_dict.items()} for cv_dict in wtd_yhats]
-        results["weights"] = self.model_averaging_weights
-        results["prediction"] = wtd_yhats_dfs
+            cv_list = []
+            for cv_i in range(self.project_CV_dict['cv_count']):
+                model_cv_i = self.cv_results[name]['estimator'][cv_i]
+                cv_list.append(pd.Series(data=model_cv_i.predict(X_df_predict), index=X_df_predict.index, name='yhat'))
+            results = cv_list
         return results
 
     def get_test_predictions(self):

@@ -66,7 +66,7 @@ class FlexibleEstimator(BaseEstimator, RegressorMixin, VBLogger):
         return self.pipe_(B, X) - y
 
     def pipe_sq_residuals(self, B, X, y):
-        return np.sum((self.pipe_(B, X)-y)**2)
+        return np.sum((self.pipe_(B, X) - y) ** 2)
 
     def fit(self, X, y):
         if self.form == 'expXB':
@@ -85,14 +85,10 @@ class FlexibleEstimator(BaseEstimator, RegressorMixin, VBLogger):
                 self.k += 1
         # https://scipy-cookbook.readthedocs.io/items/robust_regression.html
         if self.robust:
-            self.fit_est_ = minimize(self.pipe_sq_residuals, np.ones(self.k),args=(X, y),method='BFGS')  #
+            self.fit_est_ = minimize(self.pipe_sq_residuals, np.ones(self.k), args=(X, y), method='BFGS')  #
         else:
             self.fit_est_ = least_squares(self.pipe_residuals, np.ones(self.k), args=(X, y))  #
         return self
-
-    """def score(self,X,y):
-        #negative mse
-        return mean_squared_error(self.predict(X),y)"""
 
     def predict(self, X):
         B = self.fit_est_.x
@@ -152,7 +148,7 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self, ):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=10, n_repeats=1, random_state=0)
         else:
             inner_cv = self.inner_cv
 

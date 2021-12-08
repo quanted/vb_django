@@ -143,7 +143,6 @@ class DaskTasks:
                 return
             vbhelper.setData(X_df=features, y_df=target)
             inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5, 'cv_strategy': ('quantile', 5)}
-            # inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5}
             inner_cv = vbhelper.getCV(cv_dict=inner_cv_dict)
             prep_dict = {'cat_approach': 'together', 'impute_strategy': 'IterativeImputer', 'cat_idx': vbhelper.cat_idx}
             pipe_kwargs = dict(do_prep=not vbhelper.run_stacked, prep_dict=prep_dict, inner_cv=inner_cv,
@@ -168,7 +167,7 @@ class DaskTasks:
             vbhelper.setPipeDict(estimators_dict)
             vbhelper.setModelDict()
             if outer_cv == "True":
-                vbhelper.runCrossValidate()
+                vbhelper.runCrossValidate(verbose=True)
                 vbhelper.buildCVScoreDict()
             else:
                 #TODO: check processing for non-outer-cv instance for data cleanup

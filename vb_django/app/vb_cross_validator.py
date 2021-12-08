@@ -6,7 +6,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 
 class RegressorQStratifiedCV:
 
-    def __init__(self, n_splits=5, n_repeats=2, groupcount=3, random_state=0, strategy='quantile'):
+    def __init__(self, n_splits=10, n_repeats=2, groupcount=10, random_state=0, strategy='quantile'):
         self.groupcount = groupcount
         self.strategy = strategy
         self.cvkwargs = dict(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
