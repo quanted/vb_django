@@ -100,7 +100,7 @@ class VBHelper:
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
     def __init__(self, pipeline_id, test_share=0.2, cv_folds=5, cv_reps=2, random_state=0, cv_strategy=None, run_stacked="True",
-                 cv_n_jobs=4, drop_duplicates="False", nan_threshold=0.99, shuffle="True"):
+                 cv_n_jobs=-1, drop_duplicates="False", nan_threshold=0.99, shuffle="True"):
         self.id = pipeline_id
         self.logger = VBLogger(self.id)
         self.step_n = 16
@@ -227,7 +227,7 @@ class VBHelper:
 
     @staticmethod
     def saveFullFloatXy(X_df, y_df, X_df_s, y_df_s):
-        mvh = MissingValHandler({
+        mvh = MissingValHandler(prep_dict={
             'impute_strategy': 'impute_knn5'  # 'pass-through'
         })
         mvh = mvh.fit(X_df)
@@ -271,7 +271,7 @@ class VBHelper:
         cv_results = {}
         new_cv_results = {}
         cv = self.getCV()
-        # n_jobs = 1
+        # n_jobs = -1
         if verbose:
             logger.info(f"RunCrossValidate - n_jobs: {n_jobs}, scorer_list: {self.scorer_list}")
         for pipe_name, model in self.model_dict.items():

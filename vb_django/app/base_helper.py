@@ -89,7 +89,7 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
             steps = [
                 ('prep', MissingValHandler(prep_dict=self.prep_dict)),
                 ('post',
-                 make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=pipe_n)))]
+                 make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=-1)))]
             return Pipeline(steps=steps)
         except Exception as e:
             print(f"Error: {e}")

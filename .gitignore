@@ -133,6 +133,6 @@ dmypy.json
 .idea/
 
 # staticfiles
-#vb_django/static/
 vb_django/staticfiles/
 collected_static/
+dask-worker-space/

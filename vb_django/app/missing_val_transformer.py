@@ -13,7 +13,7 @@ import numpy as np
 class MissingValHandler(BaseEstimator, TransformerMixin):
     def __init__(self, pipeline_id=None, prep_dict=None):
         self.pipeline_id = pipeline_id
-        self.prep_dict = prep_dict
+        self.prep_dict = prep_dict if prep_dict is not None else {}
 
         self.strategy = None
         self.transformer = None
@@ -28,16 +28,16 @@ class MissingValHandler(BaseEstimator, TransformerMixin):
         self.setPrepDictAttrs()
 
     def setPrepDictAttrs(self):
-        if 'cat_approach' in self.prep_dict:
+        if 'cat_approach' in self.prep_dict.keys():
             self.cat_approach = self.prep_dict['cat_approach']
         else:
             self.cat_approach = 'separate'
 
-        if 'impute_strategy' in self.prep_dict:
+        if 'impute_strategy' in self.prep_dict.keys():
             self.strategy = self.prep_dict['impute_strategy']
         else:
             self.strategy = 'drop_row'
-        if 'cat_idx' in self.prep_dict:
+        if 'cat_idx' in self.prep_dict.keys():
             self.cat_idx = self.prep_dict['cat_idx']
         else:
             self.cat_idx = None
