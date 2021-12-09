@@ -11,6 +11,7 @@ import logging
 import copy
 import time
 import pickle
+from joblib import parallel_backend
 
 logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 logger = logging.getLogger("vb_dask:task")
@@ -100,7 +101,7 @@ class VBHelper:
     metrics = ["total_runs", "avg_runtime", "avg_runtime/n"]
 
     def __init__(self, pipeline_id, test_share=0.2, cv_folds=5, cv_reps=2, random_state=0, cv_strategy=None, run_stacked="True",
-                 cv_n_jobs=-1, drop_duplicates="False", nan_threshold=0.99, shuffle="True"):
+                 cv_n_jobs=4, drop_duplicates="False", nan_threshold=0.99, shuffle="True"):
         self.id = pipeline_id
         self.logger = VBLogger(self.id)
         self.step_n = 16
@@ -278,6 +279,7 @@ class VBHelper:
             if verbose:
                 logger.info(f"RunCrossValidate - Running CV on pipe_name: {pipe_name}")
             start = time.time()
+            # with parallel_backend('threading', n_jobs=2):
             model_i = cross_validate(
                 model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
                 scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, verbose=3)
