@@ -11,7 +11,7 @@ import logging
 import copy
 import time
 import pickle
-import dask_ml.model_selection as dms
+# import dask_ml.model_selection as dms
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(message)s')

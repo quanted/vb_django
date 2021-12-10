@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+# from sklearn.model_selection import RepeatedKFold, GridSearchCV
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression, LassoLarsCV
 from sklearn.compose import TransformedTargetRegressor
@@ -8,7 +8,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTrans
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
-import dask_ml.model_selection as dms
+from dask_ml.model_selection import GridSearchCV, KFold
 
 
 class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
@@ -55,7 +55,7 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self, ):
         if self.inner_cv is None:
-            inner_cv = dms.KFold(n_splits=self.cv_splits, random_state=0)
+            inner_cv = KFold(n_splits=self.cv_splits, random_state=0)
         else:
             inner_cv = self.inner_cv
         gridpoints = self.gridpoints
@@ -76,7 +76,7 @@ class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):
             'ttr__transformer': transformer_list,
             'ttr__regressor__polyfeat__degree': [2],
         }
-        outerpipe = dms.GridSearchCV(Y_T_X_T_pipe, param_grid=Y_T__param_grid, cv=inner_cv)
+        outerpipe = GridSearchCV(Y_T_X_T_pipe, param_grid=Y_T__param_grid, cv=inner_cv)
         if self.do_prep:
             steps = [('prep', MissingValHandler(prep_dict=self.prep_dict)),
                      ('post', outerpipe)]

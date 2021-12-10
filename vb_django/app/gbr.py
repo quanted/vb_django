@@ -1,11 +1,11 @@
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+# from sklearn.model_selection import RepeatedKFold
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor
 from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
-import dask_ml.model_selection as dms
+from dask_ml.model_selection import GridSearchCV, KFold
 
 
 class GBR(BaseEstimator, RegressorMixin, BaseHelper):
@@ -52,7 +52,7 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=10, n_repeats=1, random_state=0)
+            inner_cv = KFold(n_splits=10, random_state=0)
         else:
             inner_cv = self.inner_cv
         if self.est_kwargs is None:
@@ -60,7 +60,7 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
         hyper_param_dict, gbr_params = self.extractParams(self.est_kwargs)
         if not 'random_state' in gbr_params:
             gbr_params['random_state'] = 0
-        steps = [('reg', dms.GridSearchCV(GradientBoostingRegressor(**gbr_params), param_grid=hyper_param_dict, cv=inner_cv))]
+        steps = [('reg', GridSearchCV(GradientBoostingRegressor(**gbr_params), param_grid=hyper_param_dict, cv=inner_cv))]
         if self.bestT:
             steps.insert(0, 'xtransform', ColumnBestTransformer(float_k=len(self.float_idx)))
         outerpipe = Pipeline(steps=steps)

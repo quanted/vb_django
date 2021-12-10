@@ -1,14 +1,14 @@
 import numpy as np
 from scipy.optimize import least_squares, minimize
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+# from sklearn.model_selection import RepeatedKFold, GridSearchCV
 from sklearn.base import BaseEstimator, RegressorMixin
 from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.vb_helper import VBLogger
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
-import dask_ml.model_selection as dms
+from dask_ml.model_selection import GridSearchCV, KFold
 
 
 class FlexibleEstimator(BaseEstimator, RegressorMixin, VBLogger):
@@ -149,7 +149,7 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self, ):
         if self.inner_cv is None:
-            inner_cv = dms.KFold(n_splits=10, random_state=0)
+            inner_cv = KFold(n_splits=10, random_state=0)
         else:
             inner_cv = self.inner_cv
 
@@ -166,7 +166,7 @@ class FlexiblePipe(BaseEstimator, RegressorMixin, BaseHelper):
         if self.functional_form_search:
             param_grid['reg__form'] = ['powXB', 'expXB']  # ,'linear']
 
-        outerpipe = dms.GridSearchCV(pipe, param_grid=param_grid)
+        outerpipe = GridSearchCV(pipe, param_grid=param_grid)
         if self.do_prep:
             steps = [('prep', MissingValHandler(prep_dict=self.prep_dict)),
                      ('post', outerpipe)]
