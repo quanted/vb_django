@@ -8,6 +8,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTrans
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
+import dask_ml.model_selection as dms
 
 
 class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
@@ -59,7 +60,7 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self,):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
+            inner_cv = dms.KFold(n_splits=self.cv_splits, random_state=0)
         else:
             inner_cv = self.inner_cv
 
@@ -67,7 +68,7 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
         param_grid = {'C': np.logspace(-2, 2, gridpoints), 'gamma': np.logspace(-2, 0.5, gridpoints)}
         steps = [
             ('scaler', StandardScaler()),
-            ('reg', GridSearchCV(SVR(kernel='rbf', cache_size=10000, tol=1e-4, max_iter=5000), param_grid=param_grid))]
+            ('reg', dms.GridSearchCV(SVR(kernel='rbf', cache_size=10000, tol=1e-4, max_iter=5000), param_grid=param_grid))]
         if self.bestT:
             steps.insert(0, ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))))
         outerpipe = Pipeline(steps=steps)
@@ -121,7 +122,7 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self,):
         if self.inner_cv is None:
-            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
+            inner_cv = dms.KFold(n_splits=self.cv_splits, random_state=0)
         else:
             inner_cv = self.inner_cv
 
@@ -133,7 +134,7 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
             ('drop_constant', DropConst()),
             ('shrink_k2', ShrinkBigKTransformer(selector=LassoLarsCV(cv=inner_cv, max_iter=64))),
             ('scaler', StandardScaler()),
-            ('reg', GridSearchCV(LinearSVR(random_state=0, tol=1e-4, max_iter=1000), param_grid=param_grid))]
+            ('reg', dms.GridSearchCV(LinearSVR(random_state=0, tol=1e-4, max_iter=1000), param_grid=param_grid))]
         if self.bestT:
             steps = [steps[0], ('xtransform', ColumnBestTransformer(float_k=len(self.float_idx))), *steps[1:]]
         outerpipe = Pipeline(steps=steps)

@@ -5,6 +5,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTrans
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
+import dask_ml.model_selection as dms
 
 
 class L1Lars(BaseEstimator, RegressorMixin, BaseHelper):
