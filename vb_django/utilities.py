@@ -89,7 +89,11 @@ def save_model(model, model_id=None, pipeline_id=None, replace=True):
         m.save()
         logger.info(f"Model: {m.id} successfully created.")
     if m:
-        logger.info("Pipeline ID: {} saved; raw {} bytes; compressed {} bytes".format(model_id, sys.getsizeof(raw_model), sys.getsizeof(comp_model)))
+        base_size = (sys.getsizeof(raw_model)/1024.0**2)
+        comp_size = (sys.getsizeof(comp_model)/1024.0**2)
+        logger.info("Model ID: {} saved; raw {} MB; compressed {} MB".format(m.id, base_size, comp_size))
+    del raw_model
+    del comp_model
     return m
 
 

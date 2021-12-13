@@ -11,7 +11,7 @@ import logging
 import copy
 import time
 import pickle
-# import dask_ml.model_selection as dms
+from joblib import parallel_backend
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(message)s')
@@ -280,9 +280,10 @@ class VBHelper:
             if verbose:
                 logger.info(f"RunCrossValidate - Running CV on pipe_name: {pipe_name}")
             start = time.time()
-            model_i = cross_validate(
-                model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
-                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, verbose=3)
+            with parallel_backend('threading', n_jobs=-1):
+                model_i = cross_validate(
+                    model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
+                    scoring=self.scorer_list, cv=cv, n_jobs=1, verbose=3)
             end = time.time()
             if verbose:
                 logger.info(f"SCORES - {pipe_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")

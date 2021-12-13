@@ -178,12 +178,14 @@ class DaskTasks:
             except Model.DoesNotExist:
                 model_id = None
             vbhelper.save(message="Cross validation")
+            del model
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",
                           "-0/16",
                           log="Pipeline: {}, Type: {}, Error: {}".format(pipeline_id, pipeline.name, e),
                           message="Cross validation"
                           )
+        del vbhelper
 
     @staticmethod
     def get_estimator(etype):

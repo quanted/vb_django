@@ -8,7 +8,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTrans
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
-from dask_ml.model_selection import GridSearchCV, KFold
+# from dask_ml.model_selection import GridSearchCV
 
 
 class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
@@ -60,7 +60,7 @@ class RBFSVR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self,):
         if self.inner_cv is None:
-            inner_cv = KFold(n_splits=self.cv_splits, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
 
@@ -122,7 +122,7 @@ class LinSVR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self,):
         if self.inner_cv is None:
-            inner_cv = KFold(n_splits=self.cv_splits, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
 

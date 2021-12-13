@@ -1,11 +1,11 @@
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.pipeline import Pipeline
-# from sklearn.model_selection import RepeatedKFold
+from sklearn.model_selection import RepeatedKFold, GridSearchCV
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor
 from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
-from dask_ml.model_selection import GridSearchCV, KFold
+# from dask_ml.model_selection import GridSearchCV
 
 
 class GBR(BaseEstimator, RegressorMixin, BaseHelper):
@@ -52,7 +52,7 @@ class GBR(BaseEstimator, RegressorMixin, BaseHelper):
 
     def get_pipe(self):
         if self.inner_cv is None:
-            inner_cv = KFold(n_splits=10, random_state=0)
+            inner_cv = RepeatedKFold(n_splits=self.cv_splits, n_repeats=self.cv_repeats, random_state=0)
         else:
             inner_cv = self.inner_cv
         if self.est_kwargs is None:
