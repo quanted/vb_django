@@ -1,4 +1,5 @@
 dask==2021.10.0
+dask-ml==2021.10.17
 distributed==2021.10.0
 django==3.2.8
 django-cors-headers==3.10.0

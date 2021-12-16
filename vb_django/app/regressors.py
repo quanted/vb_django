@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+from sklearn.model_selection import RepeatedKFold
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression, LassoLarsCV
 from sklearn.compose import TransformedTargetRegressor
@@ -8,6 +8,7 @@ from vb_django.app.vb_transformers import ShrinkBigKTransformer, ColumnBestTrans
 from vb_django.app.missing_val_transformer import MissingValHandler
 from vb_django.app.base_helper import BaseHelper
 from sklearn.pipeline import Pipeline
+from dask_ml.model_selection import GridSearchCV
 
 
 class LinRegSupreme(BaseEstimator, RegressorMixin, BaseHelper):

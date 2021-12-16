@@ -8,10 +8,14 @@ from vb_django.utilities import update_status, save_model, update_pipeline_metad
 from vb_django.app.vb_pi import CVPlusPI
 import pandas as pd
 import logging
-import copy
+import joblib
+import socket
 import time
-import pickle
-from joblib import parallel_backend
+import copy
+import os
+from dask.distributed import Client
+from sklearn.utils import parallel_backend
+
 
 logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 logger = logging.getLogger("vb_dask:task")
@@ -279,10 +283,12 @@ class VBHelper:
             if verbose:
                 logger.info(f"RunCrossValidate - Running CV on pipe_name: {pipe_name}")
             start = time.time()
-            # with parallel_backend('threading', n_jobs=2):
-            model_i = cross_validate(
-                model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
-                scoring=self.scorer_list, cv=cv, n_jobs=n_jobs, verbose=3)
+            dask_scheduler = os.getenv("DASK_SCHEDULER", "tcp://" + socket.gethostbyname(socket.gethostname()) + ":8786")
+            client = Client(dask_scheduler)
+            with parallel_backend('dask', n_jobs=-1):     # 40min test case
+                model_i = cross_validate(
+                    model, self.X_df, self.y_df.iloc[:, 0], return_estimator=True,
+                    scoring=self.scorer_list, cv=cv, n_jobs=1, verbose=3)
             end = time.time()
             if verbose:
                 logger.info(f"SCORES - {pipe_name},{[(scorer,np.mean(model_i[f'test_{scorer}'])) for scorer in self.scorer_list]}, runtime: {(end-start)/60} min.")
@@ -560,8 +566,23 @@ class VBHelper:
     def save(self, n=None, model_id=None, message=None):
         n = self.step_n if n is None else n
         self.logger.log("Saving results...", n)
-        m = save_model(self, model_id=model_id, pipeline_id=self.id)
+        pruned = self.prune(n)
+        m = save_model(pruned, model_id=model_id, pipeline_id=self.id)
         if m:
             self.logger.log("Saving results complete", n, message=message)
         else:
             self.logger.log("Unable to save results", n, error=True)
+
+    def prune(self, n):
+        deleted = []
+        pruned = copy.copy(self.__dict__)
+        pruned_object = copy.copy(self)
+        for name, value in pruned.items():
+            if isinstance(value, pd.DataFrame):
+                delattr(pruned_object, name)
+                deleted.append(name)
+        delattr(pruned_object, 'logger')
+        self.logger.log(f"VBHelper: {self.id}, pruned attributes: {', '.join(deleted)}", n)
+        return pruned_object
+
+
