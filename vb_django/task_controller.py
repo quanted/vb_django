@@ -144,7 +144,8 @@ class DaskTasks:
             vbhelper.setData(X_df=features, y_df=target)
             inner_cv_dict = {'cv_reps': 1, 'cv_folds': 5, 'cv_strategy': ('quantile', 5)}
             inner_cv = vbhelper.getCV(cv_dict=inner_cv_dict)
-            prep_dict = {'cat_approach': 'together', 'impute_strategy': 'IterativeImputer', 'cat_idx': vbhelper.cat_idx}
+            # prep_dict = {'cat_approach': 'together', 'impute_strategy': 'IterativeImputer', 'cat_idx': vbhelper.cat_idx}
+            prep_dict = {'cat_approach': 'together', 'impute_strategy': 'impute_middle', 'cat_idx': vbhelper.cat_idx}
             pipe_kwargs = dict(do_prep=not vbhelper.run_stacked, prep_dict=prep_dict, inner_cv=inner_cv,
                                cat_idx=vbhelper.cat_idx, float_idx=vbhelper.float_idx,
                                bestT=False)
@@ -177,7 +178,7 @@ class DaskTasks:
                 model_id = model.id
             except Model.DoesNotExist:
                 model_id = None
-            vbhelper.save(message="Cross validation")
+            vbhelper.save(message="Completed.")
             del model
         except Exception as e:
             update_status(pipeline_id, "Error: Unknown error executing pipeline",

@@ -1,16 +1,26 @@
-from vb_django.utilities import update_status, save_model, update_pipeline_metadata
-from sklearn import metrics as skm
-import time
+# from vb_django.utilities import update_status, save_model, update_pipeline_metadata
+# from sklearn import metrics as skm
+# import time
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin
-from vb_django.app.vb_transformers import ColumnBestTransformer
+# from vb_django.app.vb_transformers import ColumnBestTransformer
 from vb_django.app.missing_val_transformer import MissingValHandler
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.ensemble import StackingRegressor
+from dask.distributed import Client
 
+import logging
 import warnings
+# import joblib
+# import os
+# import socket
+import django
+django.setup()
+from sklearn.utils import parallel_backend
 
 warnings.simplefilter('ignore')
+logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+logger = logging.getLogger(__name__)
 
 
 class BaseHelper:
@@ -21,7 +31,8 @@ class BaseHelper:
         self.n_, self.k_ = X.shape
         self.pipe_ = self.get_pipe()
         try:
-            self.pipe_.fit(X, y)
+            with parallel_backend('loky'):  # test case 30min with dask backend in vb_helper
+                self.pipe_.fit(X, y)
         except Exception as e:
             print(f'error fitting pipeline, error: {e}')
         return self
@@ -89,7 +100,7 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
             steps = [
                 ('prep', MissingValHandler(prep_dict=self.prep_dict)),
                 ('post',
-                 make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=-1)))]
+                 make_pipeline(StackingRegressor(est_pipes, passthrough=False, final_estimator=final_e, n_jobs=-1, verbose=5), verbose=True))]
             return Pipeline(steps=steps)
         except Exception as e:
             print(f"Error: {e}")
@@ -105,6 +116,12 @@ class MultiPipe(BaseEstimator, RegressorMixin, BaseHelper):
         if type(names) is str:
             names = [names]
         pipe_dict = {}
+        # logger.warn(f"Pipeline ID: {self.pipeline_id}, Attributes of stackingregressor: {self.pipe_['post']['stackingregressor']}")
+        # for estimator_o in self.pipe_['post']['stackingregressor'].estimators:
+        #     name = estimator_o[0]
+        #     estimator = estimator_o[1]
+        #     # logger.warn(f"Pipeline ID: {self.pipeline_id}, estimator name: {name}, estimator: {estimator}")
+        #     pipe_dict[name] = estimator
         for name in names:
             pipe_dict[name] = self.pipe_['post']['stackingregressor'].named_estimators_[name]
         return pipe_dict

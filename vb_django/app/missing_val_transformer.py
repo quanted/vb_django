@@ -24,6 +24,7 @@ class MissingValHandler(BaseEstimator, TransformerMixin):
         self.obj_idx_ = None
         self.float_idx_ = None
         self.cat_list_ = None
+        self.T_ = None
 
         self.setPrepDictAttrs()
 
