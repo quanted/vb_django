@@ -17,6 +17,6 @@ RUN chown -R www-data:www-data /opt/app
 
 WORKDIR /opt/app
 ENV PYTHONPATH="/opt/app:/opt/app/vb_django:${PYTHONPATH}"
-ENV NPATH="/opt/app:/opt/app/vb_django:${PATH}"
+ENV PATH="/opt/app:/opt/app/vb_django:${PATH}"
 USER ${APP_USER}:${APP_USER}
 #CMD ["sh", "/tmp/start-django-server.sh"]

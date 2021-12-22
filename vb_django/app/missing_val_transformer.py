@@ -3,6 +3,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.linear_model import LinearRegression
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from vb_django.app.vb_transformers import None_T, FeatureNameExtractor
@@ -101,7 +102,7 @@ class MissingValHandler(BaseEstimator, TransformerMixin):
                 cat_imputer = make_pipeline(SimpleImputer(strategy='most_frequent'), cat_encoder)
                 categorical_T = ('cat_imputer', cat_imputer, self.obj_idx_)
             elif self.strategy.lower() == "iterativeimputer":
-                numeric_T = ('num_imputer', IterativeImputer(), self.float_idx_)
+                numeric_T = ('num_imputer', IterativeImputer(estimator=LinearRegression(), max_iter=10, tol=.01), self.float_idx_)
                 cat_imputer = make_pipeline(SimpleImputer(strategy='most_frequent'), cat_encoder)
                 categorical_T = ('cat_imputer', cat_imputer, self.obj_idx_)
         if len(self.obj_idx_) == 0:
