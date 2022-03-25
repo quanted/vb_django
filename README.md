@@ -1,4 +1,4 @@
-## WVB Django
+## VB Django
 
 Django repository for managing the API for VB web. Static angular template files are managed from django.
 
