@@ -39,6 +39,8 @@ class LocationView(viewsets.ViewSet):
         :return: New location object
         """
         dataset_inputs = request.data.dict()
+        print(dataset_inputs)
+        #dataset_inputs = request.data
         serializer = self.serializer_class(data=dataset_inputs, context={'request': request})
         # TODO: Add project existence and ownership check
         if serializer.is_valid():
