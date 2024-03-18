@@ -106,7 +106,7 @@ else:
             'NAME': 'vb_postgres',
             'USER': 'postgres',
             'PASSWORD': 'postgres',
-            'HOST': 'postgres',
+            'HOST': 'vb-postgres',
             'PORT': 5432,
         }
     }
@@ -174,4 +174,5 @@ REST_FRAMEWORK = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-LOGIN_URL = "/api/user/login/"
+# LOGIN_URL = "/api/user/login/"
+LOGIN_URL = "/vb/api/user/login/"
