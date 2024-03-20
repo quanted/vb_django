@@ -30,13 +30,15 @@ from vb_django.db_setup import load_pipelines
 
 router = routers.SimpleRouter()
 # ---------- Location API endpoints ---------- #
-router.register('location', LocationView, basename='location')
+router.register('vb/api/location', LocationView, basename='location')
 # --------- Project API endpoints ---------- #
-router.register('project', ProjectView, basename='project')
+router.register('vb/api/project', ProjectView, basename='project')
 # ------ Pipeline API endpoints ------ #
-router.register('pipeline', PipelineView, basename='pipeline')
+router.register('vb/api/pipeline', PipelineView, basename='pipeline')
 # --------- Dataset API endpoints ---------- #
-router.register('dataset', DatasetView, basename='dataset')
+router.register('vb/api/dataset', DatasetView, basename='dataset')
+
+# api_patterns = path(include()
 
 
 schema_view = get_schema_view(
@@ -47,7 +49,7 @@ schema_view = get_schema_view(
     ),
     patterns=router.urls,
     public=True,
-    permission_classes=(permissions.AllowAny,),
+    permission_classes=(permissions.AllowAny,)
 )
 
 urlpatterns = [
@@ -65,12 +67,12 @@ urlpatterns = [
     path('api/user/reset/', UserResetView.as_view()),                           # POST - Password reset
 
     # ------ ADD the DRF urls registered to the router ------ #
-    path('api/', include(router.urls)),
+    # path('api/', include(router.urls)),
 
     path('info/pipelines/', pipeline_details),
 ]
 
-urlpatterns = [path('vb/', include(urlpatterns))]
+urlpatterns = [path('vb/', include(urlpatterns))] + router.urls
 
 load_pipelines(purge=True)
 
