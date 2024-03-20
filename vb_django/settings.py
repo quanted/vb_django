@@ -13,6 +13,12 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 import os
 import mimetypes
 
+# Rids the log of matplotlib's 'loaded moudles' printout:
+from matplotlib.pyplot import set_loglevel
+set_loglevel("warning")
+
+
+
 print("Starting vb django applications")
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
